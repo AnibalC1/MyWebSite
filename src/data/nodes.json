@@ -7,7 +7,7 @@
     "timestamp": "2023-06-15",
     "location": "Miami, FL",
     "emotionalTag": "achievement",
-    "media": { "type": "image", "src": "/media/bjj-black-belt.jpg", "alt": "Black belt ceremony" },
+    "media": { "type": "image", "src": "/images/photo-3wun-BJJ.jpg", "alt": "Anibal post-roll, huge smile, SQUARED gym" },
     "relatedIds": ["bjj-first-roll", "discipline-morning", "family-anchor"]
   },
   {
@@ -28,6 +28,7 @@
     "timestamp": "2022-09-01",
     "emotionalTag": "purpose",
     "people": ["family"],
+    "media": { "type": "image", "src": "/images/photo-0afl-birthday-family.jpg", "alt": "Anibal with son and wife at 50th birthday celebration" },
     "relatedIds": ["bjj-black-belt", "reflection-late-night"]
   },
   {
@@ -47,6 +48,7 @@
     "category": "reflection",
     "timestamp": "2023-11-20",
     "emotionalTag": "clarity",
+    "media": { "type": "image", "src": "/images/photo-een9-birthday-dance.jpg", "alt": "Anibal and Tory dancing" },
     "relatedIds": ["systems-builder", "family-anchor"]
   },
   {
@@ -56,6 +58,7 @@
     "category": "fitness",
     "timestamp": "2023-03-01",
     "emotionalTag": "discipline",
+    "media": { "type": "image", "src": "/images/photo-8wp2-skiing.jpg", "alt": "Anibal and Tory skiing at night" },
     "relatedIds": ["bjj-black-belt", "bjj-first-roll"]
   },
   {
@@ -66,6 +69,7 @@
     "timestamp": "2018-04-10",
     "location": "Miami, FL",
     "emotionalTag": "humility",
+    "media": { "type": "image", "src": "/images/photo-3wun-BJJ.jpg", "alt": "Anibal in BJJ rashguard, post-roll" },
     "relatedIds": ["bjj-black-belt", "discipline-morning"]
   },
   {
@@ -93,6 +97,7 @@
     "category": "fitness",
     "timestamp": "2024-02-20",
     "emotionalTag": "discipline",
+    "media": { "type": "image", "src": "/images/photo-8wp2-skiing.jpg", "alt": "Anibal and Tory on ski slope at night" },
     "relatedIds": ["discipline-morning", "bjj-black-belt", "reflection-late-night"]
   }
 ]
