@@ -1,0 +1,98 @@
+[
+  {
+    "id": "bjj-black-belt",
+    "title": "Black Belt",
+    "excerpt": "Years of pressure, repetition, and humility condensed into a single moment.",
+    "category": "bjj",
+    "timestamp": "2023-06-15",
+    "location": "Miami, FL",
+    "emotionalTag": "achievement",
+    "media": { "type": "image", "src": "/media/bjj-black-belt.jpg", "alt": "Black belt ceremony" },
+    "relatedIds": ["bjj-first-roll", "discipline-morning", "family-anchor"]
+  },
+  {
+    "id": "systems-builder",
+    "title": "Building in Silence",
+    "excerpt": "The best systems are invisible until they're essential. This one took three years.",
+    "category": "systems",
+    "timestamp": "2024-01-10",
+    "project": "arb-bot",
+    "emotionalTag": "focus",
+    "relatedIds": ["builds-first-deploy", "reflection-late-night"]
+  },
+  {
+    "id": "family-anchor",
+    "title": "Why I Build",
+    "excerpt": "Every decision maps back to one reason. Everything else is downstream of that.",
+    "category": "family",
+    "timestamp": "2022-09-01",
+    "emotionalTag": "purpose",
+    "people": ["family"],
+    "relatedIds": ["bjj-black-belt", "reflection-late-night"]
+  },
+  {
+    "id": "builds-first-deploy",
+    "title": "First Deploy",
+    "excerpt": "The moment a system goes live and becomes real. Not a demo. Not a prototype.",
+    "category": "builds",
+    "timestamp": "2024-01-15",
+    "project": "arb-bot",
+    "emotionalTag": "focus",
+    "relatedIds": ["systems-builder", "reflection-late-night"]
+  },
+  {
+    "id": "reflection-late-night",
+    "title": "3AM Clarity",
+    "excerpt": "When the world is quiet, the signal gets louder. Some of my best decisions were made at 3AM.",
+    "category": "reflection",
+    "timestamp": "2023-11-20",
+    "emotionalTag": "clarity",
+    "relatedIds": ["systems-builder", "family-anchor"]
+  },
+  {
+    "id": "discipline-morning",
+    "title": "The Morning Protocol",
+    "excerpt": "Before the world starts making demands, claim the first hour for yourself.",
+    "category": "fitness",
+    "timestamp": "2023-03-01",
+    "emotionalTag": "discipline",
+    "relatedIds": ["bjj-black-belt", "bjj-first-roll"]
+  },
+  {
+    "id": "bjj-first-roll",
+    "title": "First Roll",
+    "excerpt": "The mat doesn't care about your credentials. It only knows what you do.",
+    "category": "bjj",
+    "timestamp": "2018-04-10",
+    "location": "Miami, FL",
+    "emotionalTag": "humility",
+    "relatedIds": ["bjj-black-belt", "discipline-morning"]
+  },
+  {
+    "id": "business-vision",
+    "title": "The Bigger Frame",
+    "excerpt": "Businesses are just systems for creating value. The art is knowing which problems are worth solving.",
+    "category": "business",
+    "timestamp": "2024-06-01",
+    "emotionalTag": "vision",
+    "relatedIds": ["systems-builder", "reflection-late-night"]
+  },
+  {
+    "id": "writing-first-piece",
+    "title": "Writing to Think",
+    "excerpt": "I don't write to publish. I write to understand. Publishing is just a side effect.",
+    "category": "writing",
+    "timestamp": "2023-08-15",
+    "emotionalTag": "clarity",
+    "relatedIds": ["reflection-late-night", "family-anchor"]
+  },
+  {
+    "id": "fitness-physical-mastery",
+    "title": "The Body as Infrastructure",
+    "excerpt": "Physical capacity isn't separate from mental capacity. It's the foundation.",
+    "category": "fitness",
+    "timestamp": "2024-02-20",
+    "emotionalTag": "discipline",
+    "relatedIds": ["discipline-morning", "bjj-black-belt", "reflection-late-night"]
+  }
+]
