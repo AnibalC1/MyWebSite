@@ -31,7 +31,7 @@ const _wSurf = new THREE.Vector3();    // scratch surface position
 const _col   = new THREE.Color();
 const _clusterTgt = new THREE.Vector3();  // scratch cluster target
 const _screenCtr   = new THREE.Vector3();  // viewport center in world space
-const _V6_LOCAL    = new THREE.Vector3(0, 0, -1.4); // 1.4 units in front of camera
+const _V6_LOCAL    = new THREE.Vector3(0, 0, -3.5); // 3.5 units in front of camera — in front of globe
 const _tintCol  = new THREE.Color(0.55, 0.82, 1.0); // cyan holographic at rest
 const _clearCol = new THREE.Color(1, 1, 1);          // full color on hover
 
@@ -376,12 +376,14 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   const handleOver=(i:number)=>(e:{stopPropagation:()=>void})=>{
     e.stopPropagation();
     if(debounceRef.current) clearTimeout(debounceRef.current);
-    if(globalHoverRef.current===i) return;
-    globalHoverRef.current=i;
-    rotYs.current[i]=(Math.random()>0.5?1:-1)*(0.42+Math.random()*0.18);
-    rotZs.current[i]=(Math.random()>0.5?1:-1)*(0.08+Math.random()*0.11);
-    onHoverChange(i);
-    document.body.style.cursor='pointer';
+    debounceRef.current=setTimeout(()=>{
+      if(globalHoverRef.current===i) return;
+      globalHoverRef.current=i;
+      rotYs.current[i]=(Math.random()>0.5?1:-1)*(0.42+Math.random()*0.18);
+      rotZs.current[i]=(Math.random()>0.5?1:-1)*(0.08+Math.random()*0.11);
+      onHoverChange(i);
+      document.body.style.cursor='pointer';
+    },80);
   };
   // v8: handleOut checks which photo fired — hit sphere stays on globe so only genuine
   // mouse-exit fires this. 80ms debounce guards against micro-jitter between spheres.
