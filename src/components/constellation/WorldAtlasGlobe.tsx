@@ -153,14 +153,14 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   const rotZs   =useRef(new Float32Array(N).fill(0));
   const tintTs  =useRef(new Float32Array(N).fill(0));   // 0=tinted, 1=full color
   const bobs    =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
-  // Cluster state — target positions for time-related photos on hover
-  const clusterTgts =useRef<THREE.Vector3[]>(PHOTOS.map(()=>new THREE.Vector3()));
+  // Cluster state — ring layout (no orbit drift, computed once per hover change)
+  const ringAngles  =useRef(new Float32Array(N).fill(0));  // angle on ring per photo
+  const ringRadii   =useRef(new Float32Array(N).fill(0));  // radius (0 = not in cluster)
   const prevHovRef  =useRef(-1);
   const prevSelRef  =useRef(-1);
-  const tiIdxsRef   =useRef<number[]>([]); // indices of time-related photos for current hover/select
+  const tiIdxsRef   =useRef<number[]>([]);
   const tiSetRef    =useRef(new Set<number>());
   const connSetRef  =useRef(new Set<number>());
-  const orbitPhase  =useRef(0);
 
   // Texture loading
   useEffect(()=>{
@@ -206,19 +206,22 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         const capped=related.slice(0,30);
         tiIdxsRef.current=capped.map(r=>r.j);
         capped.forEach(({j})=>tiSetRef.current.add(j));
-        const cnt=capped.length;
-        const phiG=Math.PI*(3-Math.sqrt(5));
-        capped.forEach(({j},k)=>{
-          const y=1-(k/Math.max(cnt-1,1))*2;
-          const r=Math.sqrt(Math.max(0,1-y*y));
-          const theta=phiG*k;
-          clusterTgts.current[j].set(r*Math.cos(theta)*0.35, y*0.35, r*Math.sin(theta)*0.35);
+        // Flat ring layout — inner ring (≤10), outer ring (overflow)
+        const INNER_MAX=10;
+        const inner=capped.slice(0,Math.min(capped.length,INNER_MAX));
+        const outer=capped.slice(INNER_MAX,Math.min(capped.length,INNER_MAX+16));
+        ringAngles.current.fill(0); ringRadii.current.fill(0);
+        inner.forEach(({j},k)=>{
+          ringAngles.current[j]=(k/inner.length)*Math.PI*2;
+          ringRadii.current[j]=0.28;
+        });
+        const outerStep=outer.length>0?Math.PI/outer.length:0;
+        outer.forEach(({j},k)=>{
+          ringAngles.current[j]=(k/outer.length)*Math.PI*2+outerStep;
+          ringRadii.current[j]=0.48;
         });
       }
     }
-
-    // ── Orbit phase — smoothly rotate cluster around pivot each frame
-    if(anyHov||anySel) orbitPhase.current+=delta*0.22;
 
     const tiSet=tiSetRef.current;
     const anyActive=anyHov||anySel;
@@ -240,19 +243,19 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       // ── Scale target
       const iAmTi=tiSet.has(i);
       let tSc:number;
-      if(iAmHov||iAmSel) tSc=0.18;
+      if(iAmHov||iAmSel) tSc=0.18;                           // 1.5× anchor
       else if(iAmConn) tSc=0.135;
-      else if(iAmTi) tSc=isClickedCluster?0.11:0.132;
-      else if(anyActive) tSc=0.09;
+      else if(iAmTi) tSc=isClickedCluster?0.156:0.096;       // click=1.3×, hover=0.8×
+      else if(anyActive) tSc=0.12;                            // unrelated stay same size, just dim
       else tSc=0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
       // ── Opacity target
-      const tOp=(iAmHov||iAmSel)?1.0:iAmConn?0.80:iAmTi?(isClickedCluster?0.92:0.85):anyActive?0.08:0.48;
+      const tOp=(iAmHov||iAmSel)?1.0:iAmConn?0.80:iAmTi?(isClickedCluster?1.0:0.88):anyActive?0.08:0.48;
       opacs.current[i]+=(tOp-opacs.current[i])*Math.min(delta*9,1);
 
       // ── Tint target (0=cyan holographic, 1=full color)
-      const tTint=(iAmHov||iAmSel)?1:iAmConn?0.5:iAmTi?(isClickedCluster?1:0.7):0;
+      const tTint=(iAmHov||iAmSel)?1:iAmConn?0.5:iAmTi?1:0;  // cluster always full color
       tintTs.current[i]+=(tTint-tintTs.current[i])*Math.min(delta*9,1);
 
       // ── Cinematic rotation — spring back to 0
@@ -272,15 +275,14 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      // ── Position: orbit time-related photos around hovered/selected photo
-      if(anyActive && iAmTi && activeMesh){
-        const off=clusterTgts.current[i];
-        const scaleF=isClickedCluster?0.18/0.35:1.0; // tighten on click
-        const cos=Math.cos(orbitPhase.current), sin=Math.sin(orbitPhase.current);
+      // ── Position: flat ring around anchor in world XY plane
+      if(anyActive && iAmTi && activeMesh && ringRadii.current[i]>0){
+        const ang=ringAngles.current[i];
+        const rad=ringRadii.current[i]*(isClickedCluster?0.65:1.0); // tighten on click
         _clusterTgt.set(
-          activeMesh.position.x+(off.x*cos-off.z*sin)*scaleF,
-          activeMesh.position.y+off.y*scaleF,
-          activeMesh.position.z+(off.x*sin+off.z*cos)*scaleF
+          activeMesh.position.x+Math.cos(ang)*rad,
+          activeMesh.position.y+Math.sin(ang)*rad,
+          activeMesh.position.z
         );
         mesh.position.lerp(_clusterTgt, Math.min(delta*5,1));
       } else {
