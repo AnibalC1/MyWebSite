@@ -130,7 +130,7 @@ export default function Home() {
           <img
             src="/logo.png"
             alt="Anibal Cabral"
-            style={{ height: '56px', width: 'auto', filter: 'drop-shadow(0 0 10px rgba(201,168,76,0.6))' }}
+            style={{ height: '90px', width: 'auto', filter: 'drop-shadow(0 0 10px rgba(201,168,76,0.6))' }}
           />
         </Link>
         <div style={{ display: 'flex', gap: '2.4rem', pointerEvents: 'auto' }}>
