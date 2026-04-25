@@ -1,9 +1,11 @@
 'use client';
 
 /**
- * VideoTheater v3 — Per THEATER_PAGE_V2_SPEC.md
+ * VideoTheater v4 — Hologram Carousel
  *
  * You are seated. The room is dark. The screen is waiting.
+ * Side panels glow as holograms — cyan-tinted, scan-lined, ghostly.
+ * All 3 video elements live in the DOM simultaneously.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -41,7 +43,6 @@ function startHum(ctx: AudioContext): () => void {
 function playClunk(ctx: AudioContext) {
   const now = ctx.currentTime;
 
-  // Gate slam — high square wave transient
   const snap = ctx.createOscillator();
   const snapGain = ctx.createGain();
   snap.type = 'square'; snap.frequency.value = 800;
@@ -50,7 +51,6 @@ function playClunk(ctx: AudioContext) {
   snap.connect(snapGain); snapGain.connect(ctx.destination);
   snap.start(now); snap.stop(now + 0.025);
 
-  // Weight — low thud
   const thud = ctx.createOscillator();
   const thudGain = ctx.createGain();
   thud.type = 'sine'; thud.frequency.value = 60;
@@ -67,7 +67,7 @@ function FilmGrain({ phase }: { phase: number }) {
   const rafRef    = useRef<number>(0);
 
   useEffect(() => {
-    if (phase < 3) return; // wait until entrance step 3
+    if (phase < 3) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -87,7 +87,7 @@ function FilmGrain({ phase }: { phase: number }) {
       for (let i = 0; i < data.length; i += 4) {
         const v = Math.random() * 255;
         data[i] = data[i + 1] = data[i + 2] = v;
-        data[i + 3] = Math.random() * 46; // ~18% max opacity
+        data[i + 3] = Math.random() * 46;
       }
       ctx.putImageData(imageData, 0, 0);
       rafRef.current = requestAnimationFrame(tick);
@@ -149,7 +149,7 @@ function FlipNumber({ value, pad = 2 }: { value: number; pad?: number }) {
     if (value === displayed) return;
     setFlipping(true);
     setTimeout(() => { setDisplayed(value); setFlipping(false); }, 180);
-  }, [value]);
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <span style={{
@@ -163,26 +163,124 @@ function FlipNumber({ value, pad = 2 }: { value: number; pad?: number }) {
   );
 }
 
+// ─── Hologram side clip ────────────────────────────────────────────────────────
+/**
+ * Positioned relative to the center screen container which sits at
+ * left: 50%, transform: translateX(-50%). This component lives inside
+ * that container (which has overflow:visible) so it escapes to the side.
+ *
+ * side='left'  → appears to the LEFT of the center screen
+ * side='right' → appears to the RIGHT of the center screen
+ */
+function HologramClip({
+  src,
+  side,
+  phase,
+  onClick,
+}: {
+  src: string;
+  side: 'left' | 'right';
+  phase: number;
+  onClick: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.load();
+    v.play().catch(() => {});
+  }, [src]);
+
+  const isLeft = side === 'left';
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        // Anchored to the left or right edge of the center-screen container,
+        // then pushed outward so the hologram appears beside the center screen.
+        position: 'absolute',
+        top: '50%',
+        // left: 0% = left edge of center screen; left: 100% = right edge
+        ...(isLeft ? { left: '0%' } : { left: '100%' }),
+        // translateX(-85%) pushes the left hologram leftward (85% of its width)
+        // translateX(-15%) pushes the right hologram rightward
+        // scale(0.62) shrinks it to 62% of the center screen's size
+        transform: isLeft
+          ? 'translateY(-50%) translateX(-85%) scale(0.62) rotateY(8deg)'
+          : 'translateY(-50%) translateX(-15%) scale(0.62) rotateY(-8deg)',
+        transformOrigin: isLeft ? '85% 50%' : '15% 50%',
+        width: 'min(88vw, 1400px)',
+        aspectRatio: '16 / 9',
+        zIndex: 5,
+        cursor: 'pointer',
+        opacity: phase >= 4 ? 0.72 : 0,
+        transition: 'opacity 0.6s ease',
+        pointerEvents: phase >= 4 ? 'auto' : 'none',
+      }}
+    >
+      {/* Hologram glow border */}
+      <div style={{
+        position: 'absolute', inset: '-2px',
+        borderRadius: '3px',
+        boxShadow: '0 0 32px 8px rgba(0,210,255,0.4), 0 0 80px 16px rgba(0,180,255,0.15)',
+        border: '1px solid rgba(0,210,255,0.3)',
+        zIndex: 0, pointerEvents: 'none',
+      }} />
+
+      {/* Video — hologram-filtered */}
+      <video
+        ref={videoRef}
+        muted
+        loop
+        playsInline
+        autoPlay
+        style={{
+          position: 'absolute', inset: 0,
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          display: 'block',
+          borderRadius: '2px',
+          filter: 'hue-rotate(185deg) saturate(1.5) brightness(0.6) contrast(1.1)',
+        }}
+      >
+        <source src={src} type="video/mp4" />
+      </video>
+
+      {/* Cyan scan lines */}
+      <div aria-hidden style={{
+        position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none',
+        borderRadius: '2px',
+        backgroundImage:
+          'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,220,255,0.07) 2px, rgba(0,220,255,0.07) 3px)',
+      }} />
+
+      {/* Side vignette — fades toward center screen edge */}
+      <div aria-hidden style={{
+        position: 'absolute', inset: 0, zIndex: 4, pointerEvents: 'none',
+        borderRadius: '2px',
+        background: isLeft
+          ? 'radial-gradient(ellipse 110% 100% at 20% 50%, transparent 25%, rgba(0,15,30,0.75) 100%)'
+          : 'radial-gradient(ellipse 110% 100% at 80% 50%, transparent 25%, rgba(0,15,30,0.75) 100%)',
+      }} />
+
+      {/* Subtle animated cyan overlay */}
+      <div aria-hidden style={{
+        position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none',
+        borderRadius: '2px',
+        background: 'rgba(0,210,255,0.04)',
+        animation: 'holoFlicker 5s infinite',
+      }} />
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function VideoTheater({ clips }: Props) {
   const [current, setCurrent]   = useState(0);
-  const [dir, setDir]           = useState<1 | -1>(1);
   const [muted, setMuted]       = useState(true);
-
-  /**
-   * Entrance phases:
-   * 0 = black
-   * 1 = floor lights (0.5s)
-   * 2 = screen glow (1.0s)
-   * 3 = film grain (1.5s)
-   * 4 = video plays, screen brightens (2.0s → 2.3s)
-   */
-  const [phase, setPhase] = useState(0);
-
-  /**
-   * Transition state:
-   * 'idle' | 'flicker' | 'black' | 'open'
-   */
+  const [phase, setPhase]       = useState(0);
   const [transition, setTransition] = useState<'idle' | 'flicker' | 'black' | 'open'>('idle');
 
   const videoRef    = useRef<HTMLVideoElement>(null);
@@ -190,6 +288,9 @@ export default function VideoTheater({ clips }: Props) {
   const stopHumRef  = useRef<() => void>(() => {});
   const touchStartX = useRef<number | null>(null);
   const total       = clips.length;
+
+  const prevIdx = (current - 1 + total) % total;
+  const nextIdx = (current + 1) % total;
 
   // ── Entrance sequence ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -202,7 +303,7 @@ export default function VideoTheater({ clips }: Props) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  // Load video when phase ready
+  // Load center video when phase ready or clip changes
   useEffect(() => {
     if (phase < 4) return;
     const v = videoRef.current;
@@ -211,11 +312,9 @@ export default function VideoTheater({ clips }: Props) {
     v.play().catch(() => {});
   }, [phase, current]);
 
-  // ── Audio: boot on first click ────────────────────────────────────────────
+  // ── Audio ─────────────────────────────────────────────────────────────────
   const ensureAudio = useCallback(() => {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = createAudioCtx();
-    }
+    if (!audioCtxRef.current) audioCtxRef.current = createAudioCtx();
     const ctx = audioCtxRef.current;
     if (!ctx) return null;
     if (ctx.state === 'suspended') ctx.resume();
@@ -225,48 +324,27 @@ export default function VideoTheater({ clips }: Props) {
   const bootHum = useCallback(() => {
     const ctx = ensureAudio();
     if (!ctx) return;
-    if (stopHumRef.current.toString() !== '() => {}') return; // already running
+    if (stopHumRef.current.toString() !== '() => {}') return;
     stopHumRef.current = startHum(ctx);
   }, [ensureAudio]);
 
-  // First user gesture → start hum
   useEffect(() => {
     const handler = () => { bootHum(); document.removeEventListener('click', handler); };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
   }, [bootHum]);
 
-  // ── Projector advance sequence (650ms total) ──────────────────────────────
+  // ── Projector advance (650ms) ─────────────────────────────────────────────
   const go = useCallback((delta: 1 | -1) => {
     if (transition !== 'idle') return;
     bootHum();
-
     const ctx = ensureAudio();
 
-    // 1. Flicker (0–150ms)
     setTransition('flicker');
-
-    setTimeout(() => {
-      // 2. Cut to black (150ms) + play sound
-      setTransition('black');
-      if (ctx) playClunk(ctx);
-    }, 150);
-
-    setTimeout(() => {
-      // 3. Flip to new clip (200ms)
-      setDir(delta);
-      setCurrent(c => (c + delta + total) % total);
-    }, 200);
-
-    setTimeout(() => {
-      // 4. Screen opens from overexposure (350ms)
-      setTransition('open');
-    }, 350);
-
-    setTimeout(() => {
-      // 5. Settle to idle (650ms)
-      setTransition('idle');
-    }, 650);
+    setTimeout(() => { setTransition('black'); if (ctx) playClunk(ctx); }, 150);
+    setTimeout(() => { setCurrent(c => (c + delta + total) % total); }, 200);
+    setTimeout(() => { setTransition('open'); }, 350);
+    setTimeout(() => { setTransition('idle'); }, 650);
   }, [transition, total, ensureAudio, bootHum]);
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
@@ -291,12 +369,11 @@ export default function VideoTheater({ clips }: Props) {
 
   const clip = clips[current];
 
-  // ── Screen opacity based on transition ────────────────────────────────────
   const screenOpacity = (() => {
-    if (phase < 4)         return 0;
-    if (transition === 'flicker') return 0.4; // handled by animation
-    if (transition === 'black')   return 0;
-    if (transition === 'open')    return 1.05; // overexposure
+    if (phase < 4)                    return 0;
+    if (transition === 'flicker')     return 0.4;
+    if (transition === 'black')       return 0;
+    if (transition === 'open')        return 1.05;
     return 1;
   })();
 
@@ -307,11 +384,24 @@ export default function VideoTheater({ clips }: Props) {
       style={{
         position: 'fixed', inset: 0,
         background: '#000',
+        // overflow:visible so side holograms are not clipped
         overflow: 'visible',
         fontFamily: "'Courier New', monospace",
         cursor: 'default',
       }}
     >
+      {/* Hologram flicker keyframes */}
+      <style>{`
+        @keyframes holoFlicker {
+          0%,100% { opacity: 1; }
+          91%      { opacity: 1; }
+          92%      { opacity: 0.55; }
+          93%      { opacity: 1; }
+          96%      { opacity: 0.8; }
+          97%      { opacity: 1; }
+        }
+      `}</style>
+
       {/* ── Room ambient warm bloom ──────────────────────── */}
       <motion.div
         aria-hidden
@@ -327,9 +417,9 @@ export default function VideoTheater({ clips }: Props) {
       {/* ── Side curtain shadows ─────────────────────────── */}
       {(['left', 'right'] as const).map(side => (
         <div key={side} aria-hidden style={{
-          position: 'absolute', [side]: 0, top: 0, width: '8%', height: '100%',
-          background: `linear-gradient(to ${side === 'left' ? 'right' : 'left'}, rgba(0,0,0,0.65) 0%, transparent 100%)`,
-          zIndex: 2, pointerEvents: 'none',
+          position: 'absolute', [side]: 0, top: 0, width: '6%', height: '100%',
+          background: `linear-gradient(to ${side === 'left' ? 'right' : 'left'}, rgba(0,0,0,0.75) 0%, transparent 100%)`,
+          zIndex: 25, pointerEvents: 'none',
         }} />
       ))}
 
@@ -347,7 +437,7 @@ export default function VideoTheater({ clips }: Props) {
         style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '1.2rem 2rem', zIndex: 20,
+          padding: '1.2rem 2rem', zIndex: 30,
         }}
       >
         <a href="/" style={{
@@ -376,102 +466,40 @@ export default function VideoTheater({ clips }: Props) {
         </div>
       </motion.nav>
 
-      {/* ── THE SCREEN ───────────────────────────────────── */}
-
-      {/* ── Side Hologram Clips ──────────────────────────── */}
-      {/* PREV */}
-      <div
-        onClick={() => go(-1)}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: '48%',
-          transform: 'translate(-12%, -50%) scale(0.55) rotateY(10deg)',
-          transformOrigin: 'right center',
-          width: 'min(88vw, 1400px)',
-          aspectRatio: '16 / 9',
-          zIndex: 8,
-          cursor: 'pointer',
-          filter: 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)',
-          opacity: 0.6,
-          transition: 'opacity 0.25s, filter 0.25s',
-          boxShadow: '0 0 40px 8px rgba(0,200,255,0.25)',
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLDivElement).style.opacity = '0.85';
-          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.9) saturate(0.2) hue-rotate(185deg) contrast(1.3)';
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLDivElement).style.opacity = '0.6';
-          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)';
-        }}
-      >
-        <video
-          autoPlay muted loop playsInline
-          src={clips[(current - 1 + clips.length) % clips.length].src}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,210,255,0.07) 3px, rgba(0,210,255,0.08) 4px)',
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'rgba(0,190,255,0.06)',
-        }} />
-      </div>
-      {/* NEXT */}
-      <div
-        onClick={() => go(1)}
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: '48%',
-          transform: 'translate(12%, -50%) scale(0.55) rotateY(-10deg)',
-          transformOrigin: 'left center',
-          width: 'min(88vw, 1400px)',
-          aspectRatio: '16 / 9',
-          zIndex: 8,
-          cursor: 'pointer',
-          filter: 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)',
-          opacity: 0.6,
-          transition: 'opacity 0.25s, filter 0.25s',
-          boxShadow: '0 0 40px 8px rgba(0,200,255,0.25)',
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLDivElement).style.opacity = '0.85';
-          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.9) saturate(0.2) hue-rotate(185deg) contrast(1.3)';
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLDivElement).style.opacity = '0.6';
-          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)';
-        }}
-      >
-        <video
-          autoPlay muted loop playsInline
-          src={clips[(current + 1) % clips.length].src}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,210,255,0.07) 3px, rgba(0,210,255,0.08) 4px)',
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'rgba(0,190,255,0.06)',
-        }} />
-      </div>
-
+      {/* ══════════════════════════════════════════════════════
+          THE CAROUSEL STAGE
+          Center screen is the anchor. Side holograms are
+          children of the center container with overflow:visible
+          so they escape to the left/right edges of the screen.
+         ══════════════════════════════════════════════════════ */}
       <div style={{
         position: 'absolute',
-        /* Slightly above center — you look up at it */
         top: '48%', left: '50%',
         transform: 'translate(-50%, -50%)',
         width: 'min(88vw, 1400px)',
         aspectRatio: '16 / 9',
         zIndex: 10,
+        // CRITICAL: overflow:visible so holograms render outside this box
+        overflow: 'visible',
       }}>
-        {/* Outer glow — darkness pressing in */}
+
+        {/* ── PREV hologram — appears left of center screen ── */}
+        <HologramClip
+          src={clips[prevIdx].src}
+          side="left"
+          phase={phase}
+          onClick={() => go(-1)}
+        />
+
+        {/* ── NEXT hologram — appears right of center screen ── */}
+        <HologramClip
+          src={clips[nextIdx].src}
+          side="right"
+          phase={phase}
+          onClick={() => go(1)}
+        />
+
+        {/* ── Outer glow — darkness pressing in ─────────── */}
         <motion.div
           animate={{
             opacity: phase >= 2 ? 1 : 0,
@@ -486,19 +514,20 @@ export default function VideoTheater({ clips }: Props) {
           }}
         />
 
-        {/* Projector gate border */}
+        {/* ── Projector gate border ─────────────────────── */}
         <div style={{
           position: 'absolute', inset: 0,
           border: '1px solid rgba(201,168,76,0.08)',
           borderRadius: '2px', zIndex: 15, pointerEvents: 'none',
         }} />
 
-        {/* Screen surface */}
+        {/* ── Screen surface ────────────────────────────── */}
         <div style={{
           position: 'absolute', inset: 0,
           overflow: 'hidden', borderRadius: '1px',
+          zIndex: 10,
         }}>
-          {/* Pre-video screen glow (before video plays) */}
+          {/* Pre-video screen glow */}
           {phase < 4 && (
             <motion.div
               animate={{ opacity: phase >= 2 ? 1 : 0 }}
@@ -511,7 +540,7 @@ export default function VideoTheater({ clips }: Props) {
             />
           )}
 
-          {/* VIDEO */}
+          {/* CENTER VIDEO — full color, main screen */}
           <motion.div
             animate={{
               opacity: screenOpacity,
@@ -552,7 +581,7 @@ export default function VideoTheater({ clips }: Props) {
             background: 'radial-gradient(ellipse 100% 100% at 50% 50%, transparent 60%, rgba(0,0,0,0.5) 100%)',
           }} />
 
-          {/* Sound toggle — bottom right corner, ghost at rest */}
+          {/* Sound toggle */}
           <button
             onClick={e => { e.stopPropagation(); setMuted(m => !m); }}
             style={{
@@ -585,7 +614,6 @@ export default function VideoTheater({ clips }: Props) {
             zIndex: 20,
           }}
         >
-          {/* Left arrow */}
           <button
             onClick={() => go(-1)}
             style={{
@@ -593,14 +621,12 @@ export default function VideoTheater({ clips }: Props) {
               color: 'rgba(201,168,76,0.25)', fontSize: '0.75rem',
               cursor: 'pointer', fontFamily: "'Courier New', monospace",
               letterSpacing: '0.1em', padding: '4px 8px',
-              transition: 'color 0.2s, opacity 0.2s',
-              opacity: 0.25,
+              transition: 'color 0.2s, opacity 0.2s', opacity: 0.25,
             }}
             onMouseEnter={e => { e.currentTarget.style.color = '#c9a84c'; e.currentTarget.style.opacity = '0.9'; }}
             onMouseLeave={e => { e.currentTarget.style.color = 'rgba(201,168,76,0.25)'; e.currentTarget.style.opacity = '0.25'; }}
           >&lt;</button>
 
-          {/* Mechanical film counter */}
           <div style={{
             border: '1px solid rgba(201,168,76,0.2)',
             background: 'rgba(0,0,0,0.8)',
@@ -616,7 +642,6 @@ export default function VideoTheater({ clips }: Props) {
             <span style={{ opacity: 0.5 }}>{String(total).padStart(2, '0')}</span>
           </div>
 
-          {/* Right arrow */}
           <button
             onClick={() => go(1)}
             style={{
@@ -624,15 +649,14 @@ export default function VideoTheater({ clips }: Props) {
               color: 'rgba(201,168,76,0.25)', fontSize: '0.75rem',
               cursor: 'pointer', fontFamily: "'Courier New', monospace",
               letterSpacing: '0.1em', padding: '4px 8px',
-              transition: 'color 0.2s, opacity 0.2s',
-              opacity: 0.25,
+              transition: 'color 0.2s, opacity 0.2s', opacity: 0.25,
             }}
             onMouseEnter={e => { e.currentTarget.style.color = '#c9a84c'; e.currentTarget.style.opacity = '0.9'; }}
             onMouseLeave={e => { e.currentTarget.style.color = 'rgba(201,168,76,0.25)'; e.currentTarget.style.opacity = '0.25'; }}
           >&gt;</button>
         </motion.div>
 
-        {/* Clip title — below controls */}
+        {/* Clip title */}
         <AnimatePresence mode="wait">
           <motion.div
             key={current}
