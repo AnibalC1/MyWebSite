@@ -62,6 +62,7 @@ export default function Home() {
           muted
           loop
           playsInline
+          onEnded={e => { const v = e.currentTarget; v.currentTime = 0; v.play(); }}
           style={{
             width: '100%',
             height: '100%',
