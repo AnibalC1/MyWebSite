@@ -275,11 +275,12 @@ const Globe = memo(function Globe({
 // ─── Globe System ─────────────────────────────────────────────────────────────
 
 const GlobeSystem = memo(function GlobeSystem({
-  hoveredIdRef, dragRef, momentumRef, onSelect, onHoverChange,
+  hoveredIdRef, dragRef, momentumRef, universeRef, onSelect, onHoverChange,
 }: {
   hoveredIdRef: React.MutableRefObject<string | null>;
   dragRef: React.MutableRefObject<DragState>;
   momentumRef: React.MutableRefObject<MomentumStore>;
+  universeRef: React.MutableRefObject<THREE.Group | null>;
   onSelect: (m: Memory) => void;
   onHoverChange: (id: string | null) => void;
 }) {
@@ -294,7 +295,7 @@ const GlobeSystem = memo(function GlobeSystem({
   const globeTextures = globeMemories.map(mems => mems.map(() => allTextures[idx++]));
 
   return (
-    <group>
+    <group ref={universeRef}>
       <StarField />
       <GlobeConnections hoveredIdRef={hoveredIdRef} />
       {GLOBE_DEFS.map((def, i) => (
@@ -346,6 +347,9 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   });
   // Per-globe momentum — isolated so dragging one globe never affects others
   const momentumRef = useRef<MomentumStore>({});
+  const universeRef = useRef<THREE.Group | null>(null);
+  const isDragging = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
 
   const handleHoverChange = useCallback((id: string | null) => {
     if (id === null) {
@@ -365,7 +369,11 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const gid = hoveredIdRef.current;
-    if (!gid) return;
+    if (!gid) {
+      isDragging.current = true;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
     const d = dragRef.current;
     d.active = true; d.globeId = gid;
     d.lastX = e.clientX; d.lastY = e.clientY;
@@ -378,6 +386,14 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     mouse.current = [(e.clientX / window.innerWidth) * 2 - 1, (e.clientY / window.innerHeight) * 2 - 1];
+    if (isDragging.current && !hoveredIdRef.current && universeRef.current) {
+      const dx = e.clientX - lastMouse.current.x;
+      const dy = e.clientY - lastMouse.current.y;
+      universeRef.current.rotation.y += dx * 0.005;
+      universeRef.current.rotation.x = THREE.MathUtils.clamp(universeRef.current.rotation.x + dy * 0.003, -0.7, 0.7);
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+    }
+
     const d = dragRef.current;
     if (!d.active) return;
     const dx = (e.clientX - d.lastX) * 0.013;
@@ -389,6 +405,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
 
   const handleMouseUp = useCallback(() => {
     dragRef.current.active = false;
+    isDragging.current = false;
   }, []);
 
   return (
@@ -411,6 +428,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
             hoveredIdRef={hoveredIdRef}
             dragRef={dragRef}
             momentumRef={momentumRef}
+            universeRef={universeRef}
             onSelect={onSelect}
             onHoverChange={handleHoverChange}
           />
