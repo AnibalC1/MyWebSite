@@ -1,240 +1,263 @@
 'use client';
 
-import { useState, lazy, Suspense } from 'react';
+import dynamic from 'next/dynamic';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
 import Link from 'next/link';
-import { Memory } from '@/data/memories';
+import type { Memory } from '@/data/memories';
 
-const ConstellationScene = lazy(() => import('@/components/constellation/ConstellationScene'));
+const GlobeScene = dynamic(
+  () => import('@/components/constellation/GlobeScene').then(m => ({ default: m.GlobeScene })),
+  { ssr: false }
+);
 
-const NAV = [
-  { href: '/about',        label: 'About' },
-  { href: '/memory-atlas', label: 'Atlas' },
-  { href: '/builds',       label: 'Builds' },
-  { href: '/contact',      label: 'Contact' },
-];
-
-export default function HomePage() {
+export default function Home() {
   const [selected, setSelected] = useState<Memory | null>(null);
-  const [ready, setReady]       = useState(false);
+  const [ready, setReady] = useState(false);
+
+  // Fade-in on mount
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 120);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <main
-      className="relative w-screen h-screen overflow-hidden"
-      style={{ background: '#08080a' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'radial-gradient(ellipse at 50% 60%, #0a0806 0%, #000000 100%)',
+        overflow: 'hidden',
+        opacity: ready ? 1 : 0,
+        transition: 'opacity 1.2s ease',
+      }}
     >
       {/* Film grain */}
       <div className="grain-overlay" aria-hidden />
 
-      {/* Ambient radial glow */}
-      <div
-        className="absolute inset-0 pointer-events-none z-[1]"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(201,168,76,0.045) 0%, transparent 65%)',
-        }}
-      />
+      {/* 3D scene — full bleed */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+        <GlobeScene onSelect={setSelected} />
+      </div>
 
-      {/* Globe */}
-      <motion.div
-        className="absolute inset-0 z-[2]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 3, ease: 'easeOut' }}
-        onAnimationComplete={() => setReady(true)}
-      >
-        <Suspense fallback={null}>
-          <ConstellationScene onSelect={setSelected} />
-        </Suspense>
-      </motion.div>
-
-      {/* Hero text — bottom left */}
-      <motion.div
-        className="absolute bottom-12 left-8 md:left-14 z-10 pointer-events-none"
-        initial={{ opacity: 0, y: 28 }}
+      {/* Ghost nav */}
+      <motion.nav
+        initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.8, delay: 1.4, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ delay: 2.2, duration: 1.0, ease: 'easeOut' }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '1.6rem 2.8rem',
+          pointerEvents: 'none',
+        }}
       >
-        <h1
-          className="font-light italic leading-[1.1] mb-4"
-          style={{
-            fontFamily:   'var(--font-display)',
-            color:        'var(--warm-white)',
-            fontSize:     'clamp(1.7rem, 3.5vw, 3.2rem)',
-            textShadow:   '0 2px 60px rgba(8,8,10,0.95)',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          I build systems,
-          <br />
-          discipline, and legacy.
-        </h1>
-        <p
-          className="text-[0.6rem] uppercase tracking-[0.32em]"
-          style={{ color: 'rgba(240,237,232,0.35)', fontFamily: 'var(--font-body)' }}
-        >
-          Anibal Cabral
+        <span style={{
+          fontFamily: '"Cormorant Garamond", serif',
+          fontSize: '1.05rem',
+          letterSpacing: '0.22em',
+          color: '#c9a84c',
+          textTransform: 'uppercase',
+          textShadow: '0 0 20px #c9a84c55',
+          pointerEvents: 'auto',
+        }}>
+          AC
+        </span>
+        <div style={{ display: 'flex', gap: '2.4rem', pointerEvents: 'auto' }}>
+          {[
+            { label: 'About', href: '/about' },
+            { label: 'Builds', href: '/builds' },
+            { label: 'Contact', href: '/contact' },
+          ].map(({ label, href }) => (
+            <Link
+              key={href}
+              href={href}
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '0.7rem',
+                letterSpacing: '0.2em',
+                color: 'rgba(255,255,255,0.45)',
+                textDecoration: 'none',
+                textTransform: 'uppercase',
+                transition: 'color 0.3s ease',
+              }}
+              onMouseOver={e => (e.currentTarget.style.color = '#c9a84c')}
+              onMouseOut={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </motion.nav>
+
+      {/* Hero tagline */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.8, duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          position: 'absolute',
+          bottom: '10%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10,
+          textAlign: 'center',
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <p style={{
+          fontFamily: '"Cormorant Garamond", serif',
+          fontSize: 'clamp(1.1rem, 2.4vw, 1.9rem)',
+          fontStyle: 'italic',
+          color: 'rgba(255,255,255,0.7)',
+          letterSpacing: '0.08em',
+          margin: 0,
+          textShadow: '0 0 30px rgba(201,168,76,0.2)',
+        }}>
+          I build systems, discipline, and legacy.
+        </p>
+        <p style={{
+          fontFamily: 'Inter, sans-serif',
+          fontSize: '0.6rem',
+          letterSpacing: '0.35em',
+          color: 'rgba(255,255,255,0.2)',
+          textTransform: 'uppercase',
+          marginTop: '0.9rem',
+        }}>
+          Click a globe to explore
         </p>
       </motion.div>
 
-      {/* Ghost nav — top right */}
-      <motion.nav
-        className="absolute top-8 right-8 md:right-14 z-10 flex gap-7 items-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.2, delay: 2.2 }}
-      >
-        {NAV.map(({ href, label }) => (
-          <Link
-            key={href}
-            href={href}
-            className="text-[0.6rem] uppercase tracking-[0.22em] transition-colors duration-400"
-            style={{ color: 'rgba(240,237,232,0.28)', fontFamily: 'var(--font-body)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(201,168,76,0.9)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(240,237,232,0.28)'; }}
-          >
-            {label}
-          </Link>
-        ))}
-      </motion.nav>
-
-      {/* Explore hint */}
-      {ready && !selected && (
-        <motion.p
-          className="absolute bottom-14 right-8 md:right-14 z-10 pointer-events-none text-[0.55rem] uppercase tracking-[0.3em]"
-          style={{ color: 'rgba(240,237,232,0.2)', fontFamily: 'var(--font-body)' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.6, 0] }}
-          transition={{ duration: 4, delay: 3, repeat: 1, ease: 'easeInOut' }}
-        >
-          Touch a memory
-        </motion.p>
-      )}
-
-      {/* Expanded memory view */}
+      {/* Expanded memory overlay */}
       <AnimatePresence>
         {selected && (
-          <>
-            {/* Backdrop */}
+          <motion.div
+            key={selected.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: 'easeInOut' }}
+            onClick={() => setSelected(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.82)',
+              backdropFilter: 'blur(22px)',
+              WebkitBackdropFilter: 'blur(22px)',
+              cursor: 'pointer',
+            }}
+          >
             <motion.div
-              key="backdrop"
-              className="fixed inset-0 z-20"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.55 }}
-              onClick={() => setSelected(null)}
-              style={{ background: 'rgba(8,8,10,0.88)', backdropFilter: 'blur(20px)' }}
-            />
-
-            {/* Memory panel */}
-            <motion.div
-              key="panel"
-              className="fixed inset-0 z-30 flex items-center justify-center p-6 md:p-12"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
+              initial={{ scale: 0.82, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.88, y: 20, opacity: 0 }}
+              transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'relative',
+                maxWidth: '640px',
+                width: '90vw',
+                cursor: 'default',
+                background: 'rgba(10,8,6,0.55)',
+                border: '1px solid rgba(201,168,76,0.18)',
+                borderRadius: '2px',
+                overflow: 'hidden',
+              }}
             >
-              <motion.div
-                initial={{ scale: 0.88, y: 24 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.92, y: 12, opacity: 0 }}
-                transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-                className="relative w-full max-w-[680px]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Photo */}
-                <div
-                  className="relative w-full overflow-hidden"
-                  style={{ aspectRatio: '4/3' }}
-                >
-                  <Image
-                    src={selected.img}
-                    alt={selected.title}
-                    fill
-                    className="object-cover"
-                    priority
-                    sizes="680px"
-                  />
-                  {/* Vignette */}
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        'linear-gradient(to top, rgba(8,8,10,0.8) 0%, rgba(8,8,10,0.1) 50%, transparent 100%)',
-                    }}
-                  />
-                  {/* Category badge */}
-                  <div className="absolute top-5 left-5">
-                    <span
-                      className="text-[0.6rem] uppercase tracking-[0.22em] px-3 py-1.5"
-                      style={{
-                        background: 'rgba(8,8,10,0.6)',
-                        border:     '1px solid rgba(201,168,76,0.4)',
-                        color:      '#c9a84c',
-                        fontFamily: 'var(--font-body)',
-                        backdropFilter: 'blur(8px)',
-                      }}
-                    >
-                      {selected.category}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Text */}
-                <div className="mt-7 px-1">
-                  <h2
-                    className="font-light italic mb-3 leading-[1.1]"
-                    style={{
-                      fontFamily:    'var(--font-display)',
-                      color:         'var(--warm-white)',
-                      fontSize:      'clamp(1.9rem, 3vw, 2.8rem)',
-                      letterSpacing: '-0.02em',
-                    }}
-                  >
-                    {selected.title}
-                  </h2>
-                  <p
-                    className="text-[0.95rem] leading-relaxed"
-                    style={{
-                      color:      'rgba(240,237,232,0.55)',
-                      fontFamily: 'var(--font-body)',
-                      maxWidth:   '52ch',
-                    }}
-                  >
-                    {selected.caption}
-                  </p>
-                </div>
-
-                {/* Close */}
-                <button
-                  onClick={() => setSelected(null)}
-                  className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center"
+              {/* Photo */}
+              <div style={{ position: 'relative', width: '100%', paddingBottom: '66%', overflow: 'hidden' }}>
+                <img
+                  src={selected.img}
+                  alt={selected.title}
                   style={{
-                    background:     'rgba(8,8,10,0.65)',
-                    border:         '1px solid rgba(240,237,232,0.1)',
-                    color:          'rgba(240,237,232,0.5)',
-                    fontSize:       '1.1rem',
-                    backdropFilter: 'blur(8px)',
-                    transition:     'all 200ms',
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color  = '#f0ede8';
-                    e.currentTarget.style.border = '1px solid rgba(201,168,76,0.4)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color  = 'rgba(240,237,232,0.5)';
-                    e.currentTarget.style.border = '1px solid rgba(240,237,232,0.1)';
-                  }}
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </motion.div>
+                />
+                {/* Gold gradient overlay at bottom */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '55%',
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
+                }} />
+              </div>
+
+              {/* Text panel */}
+              <div style={{ padding: '1.6rem 2rem 2rem' }}>
+                <p style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: '0.62rem',
+                  letterSpacing: '0.3em',
+                  color: '#c9a84c',
+                  textTransform: 'uppercase',
+                  marginBottom: '0.6rem',
+                }}>
+                  {selected.category}
+                </p>
+                <h2 style={{
+                  fontFamily: '"Cormorant Garamond", serif',
+                  fontSize: 'clamp(1.6rem, 3vw, 2.2rem)',
+                  color: '#fff',
+                  margin: '0 0 0.9rem',
+                  lineHeight: 1.1,
+                }}>
+                  {selected.title}
+                </h2>
+                <p style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: '0.85rem',
+                  color: 'rgba(255,255,255,0.6)',
+                  lineHeight: 1.7,
+                  margin: 0,
+                }}>
+                  {selected.caption}
+                </p>
+              </div>
+
+              {/* Close button */}
+              <button
+                onClick={() => setSelected(null)}
+                style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  right: '1rem',
+                  background: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '50%',
+                  width: '2rem',
+                  height: '2rem',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'border-color 0.2s',
+                }}
+                onMouseOver={e => (e.currentTarget.style.borderColor = '#c9a84c')}
+                onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)')}
+              >
+                ×
+              </button>
             </motion.div>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
     </main>
