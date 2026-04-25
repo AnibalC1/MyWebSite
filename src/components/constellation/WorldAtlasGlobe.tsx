@@ -30,6 +30,8 @@ const _wPos  = new THREE.Vector3();    // scratch world position
 const _wSurf = new THREE.Vector3();    // scratch surface position
 const _col   = new THREE.Color();
 const _clusterTgt = new THREE.Vector3();  // scratch cluster target
+const _screenCtr   = new THREE.Vector3();  // viewport center in world space
+const _V6_LOCAL    = new THREE.Vector3(0, 0, -1.4); // 1.4 units in front of camera
 const _tintCol  = new THREE.Color(0.55, 0.82, 1.0); // cyan holographic at rest
 const _clearCol = new THREE.Color(1, 1, 1);          // full color on hover
 
@@ -213,12 +215,12 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         ringAngles.current.fill(0); ringRadii.current.fill(0);
         inner.forEach(({j},k)=>{
           ringAngles.current[j]=(k/inner.length)*Math.PI*2;
-          ringRadii.current[j]=0.28;
+          ringRadii.current[j]=0.32;  // world units at ~1.4 from camera
         });
         const outerStep=outer.length>0?Math.PI/outer.length:0;
         outer.forEach(({j},k)=>{
           ringAngles.current[j]=(k/outer.length)*Math.PI*2+outerStep;
-          ringRadii.current[j]=0.48;
+          ringRadii.current[j]=0.52;
         });
       }
     }
@@ -233,6 +235,9 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
     else _gQ.identity();
 
     const t=performance.now()/1000;
+
+    // Screen-center world point — hovered photo flies here, cluster ring forms here
+    _screenCtr.copy(_V6_LOCAL).applyMatrix4(camera.matrixWorld);
 
     for(let i=0;i<N;i++){
       const mesh=meshRefs.current[i];const mat=matRefs.current[i];
@@ -275,14 +280,16 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      // ── Position: flat ring around anchor in world XY plane
-      if(anyActive && iAmTi && activeMesh && ringRadii.current[i]>0){
+      // ── Position: hovered → screen center; cluster → ring around screen center
+      if(iAmHov||iAmSel){
+        mesh.position.lerp(_screenCtr, Math.min(delta*6,1));
+      } else if(anyActive && iAmTi && ringRadii.current[i]>0){
         const ang=ringAngles.current[i];
-        const rad=ringRadii.current[i]*(isClickedCluster?0.65:1.0); // tighten on click
+        const rad=ringRadii.current[i]*(isClickedCluster?0.60:1.0);
         _clusterTgt.set(
-          activeMesh.position.x+Math.cos(ang)*rad,
-          activeMesh.position.y+Math.sin(ang)*rad,
-          activeMesh.position.z
+          _screenCtr.x+Math.cos(ang)*rad,
+          _screenCtr.y+Math.sin(ang)*rad,
+          _screenCtr.z
         );
         mesh.position.lerp(_clusterTgt, Math.min(delta*5,1));
       } else {
