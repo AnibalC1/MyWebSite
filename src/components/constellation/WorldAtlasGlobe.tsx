@@ -335,24 +335,27 @@ function GlobeGroup({
 // CameraRig replaced by OrbitControls in Canvas
 
 // ─── Info panel (DOM overlay) ─────────────────────────────────────────────────
-const PHOTOS = [
-  '/images/photo-0afl-birthday-family.jpg',
-  '/images/photo-3wun-BJJ.jpg',
-  '/images/photo-8wp2-skiing.jpg',
-  '/images/photo-een9-birthday-dance.jpg',
-  '/images/photo-e27v-birthday-lift.jpg',
-  '/images/photo-ayyg-christmas-son.jpg',
-  '/images/photo-oq31-family-selfie.jpg',
-  '/images/photo-5dif-christmas-tory.jpg',
-  '/images/usb-IMG_0091.JPG',
-  '/images/usb-IMG_0092.JPG',
-  '/images/usb-IMG_0093.JPG',
-  '/images/usb-IMG_0094.JPG',
-  '/images/usb-IMG_0121.JPG',
-  '/images/usb-IMG_0151.JPG',
-  '/images/usb-IMG_0200.JPG',
-  '/images/usb-IMG_0230.JPG',
-];
+const CLUSTER_PHOTOS: Record<string, string[]> = {
+  'worcester': ['/images/atlas/worcester/IMG_0091.JPG', '/images/atlas/worcester/IMG_0092.JPG', '/images/atlas/worcester/IMG_0093.JPG', '/images/atlas/worcester/IMG_0094.JPG', '/images/atlas/worcester/IMG_0095.JPG', '/images/atlas/worcester/IMG_0121.JPG', '/images/atlas/worcester/IMG_0151.JPG', '/images/atlas/worcester/IMG_0152.JPG', '/images/atlas/worcester/IMG_0156.JPG', '/images/atlas/worcester/IMG_0398.JPG', '/images/atlas/worcester/IMG_0412.JPG', '/images/atlas/worcester/IMG_0415.JPG', '/images/atlas/worcester/IMG_0421.JPG', '/images/atlas/worcester/IMG_0422.JPG', '/images/atlas/worcester/IMG_0423.JPG', '/images/atlas/worcester/IMG_0427.JPG'],
+  'nyc_nj': ['/images/atlas/nyc_nj/IMG_4418.JPG', '/images/atlas/nyc_nj/IMG_4424.JPG', '/images/atlas/nyc_nj/IMG_4425.JPG', '/images/atlas/nyc_nj/IMG_4426.JPG', '/images/atlas/nyc_nj/IMG_4427.JPG', '/images/atlas/nyc_nj/IMG_4428.JPG', '/images/atlas/nyc_nj/IMG_4430.JPG', '/images/atlas/nyc_nj/IMG_4432.JPG', '/images/atlas/nyc_nj/IMG_4433.JPG', '/images/atlas/nyc_nj/IMG_4446.JPG', '/images/atlas/nyc_nj/IMG_4461.JPG', '/images/atlas/nyc_nj/IMG_4462.JPG', '/images/atlas/nyc_nj/IMG_4463.JPG', '/images/atlas/nyc_nj/IMG_4465.JPG', '/images/atlas/nyc_nj/IMG_4494.JPG', '/images/atlas/nyc_nj/IMG_4497.JPG'],
+  'manchester': ['/images/atlas/manchester/IMG_1792.JPG', '/images/atlas/manchester/IMG_1793.JPG', '/images/atlas/manchester/IMG_1794.JPG', '/images/atlas/manchester/IMG_7328.JPG', '/images/atlas/manchester/IMG_7329.JPG'],
+  'houston': ['/images/atlas/houston/IMG_1393.JPG', '/images/atlas/houston/IMG_1394.JPG', '/images/atlas/houston/IMG_1395.JPG', '/images/atlas/houston/IMG_1396.JPG', '/images/atlas/houston/IMG_1397.JPG', '/images/atlas/houston/IMG_1416.JPG', '/images/atlas/houston/IMG_1417.JPG', '/images/atlas/houston/IMG_1418.JPG', '/images/atlas/houston/IMG_1443.JPG', '/images/atlas/houston/IMG_1444.JPG', '/images/atlas/houston/IMG_1448.JPG', '/images/atlas/houston/IMG_1474.JPG', '/images/atlas/houston/IMG_1475.JPG'],
+  'scranton': ['/images/atlas/scranton/PXL_20240704_004826502.jpg', '/images/atlas/scranton/PXL_20240704_005049212.jpg', '/images/atlas/scranton/PXL_20240704_005119969.MP.jpg', '/images/atlas/scranton/PXL_20240704_005125117.MP.jpg'],
+  'boston': ['/images/atlas/boston/IMG_1390.JPG', '/images/atlas/boston/IMG_6520.JPG', '/images/atlas/boston/IMG_6521.JPG', '/images/atlas/boston/IMG_8049.JPG', '/images/atlas/boston/IMG_8050.JPG', '/images/atlas/boston/IMG_8051.JPG', '/images/atlas/boston/IMG_8052.JPG', '/images/atlas/boston/IMG_8053.JPG', '/images/atlas/boston/IMG_8054.JPG', '/images/atlas/boston/IMG_8055.JPG'],
+  'cancun': ['/images/atlas/cancun/IMG_0834.jpeg', '/images/atlas/cancun/IMG_9430.JPG', '/images/atlas/cancun/IMG_9431.JPG', '/images/atlas/cancun/IMG_9432.JPG', '/images/atlas/cancun/IMG_9442.JPG', '/images/atlas/cancun/IMG_9443.JPG', '/images/atlas/cancun/IMG_9450.JPG', '/images/atlas/cancun/IMG_9452.JPG', '/images/atlas/cancun/IMG_9453.JPG', '/images/atlas/cancun/IMG_9454.JPG', '/images/atlas/cancun/IMG_9455.JPG', '/images/atlas/cancun/IMG_9456.JPG', '/images/atlas/cancun/IMG_9457.JPG', '/images/atlas/cancun/IMG_9458.JPG', '/images/atlas/cancun/IMG_9459.JPG', '/images/atlas/cancun/IMG_9460.JPG'],
+  'springfield': ['/images/atlas/springfield/IMG_0200.JPG', '/images/atlas/springfield/IMG_0201.JPG'],
+};
+
+const CLUSTER_COUNTS: Record<string, number> = {
+  'worcester': 297,
+  'nyc_nj': 84,
+  'manchester': 5,
+  'houston': 13,
+  'scranton': 4,
+  'boston': 10,
+  'cancun': 22,
+  'springfield': 2,
+};
 
 function ClusterPanel({
   clusterId, onClose,
@@ -421,7 +424,7 @@ function ClusterPanel({
           Featured Memories
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          {PHOTOS.map((src, i) => (
+          {(CLUSTER_PHOTOS[clusterId] ?? []).slice(0, 16).map((src, i) => (
             <div key={i} style={{
               aspectRatio: '1', borderRadius: '4px', overflow: 'hidden',
               border: '1px solid rgba(0,212,255,0.12)',
@@ -440,7 +443,7 @@ function ClusterPanel({
           color: 'rgba(255,255,255,0.22)', marginTop: '1.4rem',
           textAlign: 'center', letterSpacing: '0.08em',
         }}>
-          {cluster.count} total photos from this location
+          {(CLUSTER_COUNTS[clusterId] ?? cluster.count).toLocaleString()} photos from this location
         </p>
       </div>
     </div>
