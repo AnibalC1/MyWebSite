@@ -310,18 +310,18 @@ export default function VideoTheater({ clips }: Props) {
           position: 'absolute',
           left: 0,
           top: '50%',
-          transform: 'translate(-10%, -55%) scale(0.42) rotateY(12deg)',
+          transform: 'translate(-8%, -54%) scale(0.62) rotateY(8deg)',
           transformOrigin: 'right center',
           width: 'min(72vw, 960px)',
           aspectRatio: '16/9',
-          opacity: 0.28,
+          opacity: 0.75,
           cursor: 'pointer',
           zIndex: 5,
-          filter: 'brightness(0.3) saturate(0.15)',
-          transition: 'opacity 0.2s',
+          filter: 'brightness(1.4) saturate(0.15) hue-rotate(185deg) contrast(1.2) drop-shadow(0 0 28px rgba(0,210,255,0.5))',
+          transition: 'opacity 0.2s, filter 0.2s',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.45')}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.28')}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.filter = 'brightness(1.6) saturate(0.2) hue-rotate(185deg) contrast(1.2) drop-shadow(0 0 40px rgba(0,210,255,0.7))'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.filter = 'brightness(1.4) saturate(0.15) hue-rotate(185deg) contrast(1.2) drop-shadow(0 0 28px rgba(0,210,255,0.5))'; }}
       >
         <video
           muted
@@ -331,6 +331,18 @@ export default function VideoTheater({ clips }: Props) {
           <source src={clips[(current - 1 + total) % total].src} type="video/mp4" />
         </video>
         <Sprockets />
+        {/* Holographic scan lines */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,210,255,0.07) 3px, rgba(0,210,255,0.08) 4px)',
+          mixBlendMode: 'screen',
+        }} />
+        {/* Holographic tint */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'rgba(0,190,255,0.08)',
+          mixBlendMode: 'screen',
+        }} />
       </div>
 
       {/* Next */}
@@ -340,18 +352,18 @@ export default function VideoTheater({ clips }: Props) {
           position: 'absolute',
           right: 0,
           top: '50%',
-          transform: 'translate(10%, -55%) scale(0.42) rotateY(-12deg)',
+          transform: 'translate(8%, -54%) scale(0.62) rotateY(-8deg)',
           transformOrigin: 'left center',
           width: 'min(72vw, 960px)',
           aspectRatio: '16/9',
-          opacity: 0.28,
+          opacity: 0.75,
           cursor: 'pointer',
           zIndex: 5,
-          filter: 'brightness(0.3) saturate(0.15)',
-          transition: 'opacity 0.2s',
+          filter: 'brightness(1.4) saturate(0.15) hue-rotate(185deg) contrast(1.2) drop-shadow(0 0 28px rgba(0,210,255,0.5))',
+          transition: 'opacity 0.2s, filter 0.2s',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.45')}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.28')}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.filter = 'brightness(1.6) saturate(0.2) hue-rotate(185deg) contrast(1.2) drop-shadow(0 0 40px rgba(0,210,255,0.7))'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.filter = 'brightness(1.4) saturate(0.15) hue-rotate(185deg) contrast(1.2) drop-shadow(0 0 28px rgba(0,210,255,0.5))'; }}
       >
         <video
           muted
@@ -361,6 +373,18 @@ export default function VideoTheater({ clips }: Props) {
           <source src={clips[(current + 1) % total].src} type="video/mp4" />
         </video>
         <Sprockets />
+        {/* Holographic scan lines */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,210,255,0.07) 3px, rgba(0,210,255,0.08) 4px)',
+          mixBlendMode: 'screen',
+        }} />
+        {/* Holographic tint */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'rgba(0,190,255,0.08)',
+          mixBlendMode: 'screen',
+        }} />
       </div>
 
       {/* ── Active slide ──────────────────────────────────── */}
