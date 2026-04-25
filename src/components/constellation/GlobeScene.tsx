@@ -13,6 +13,21 @@ import { MEMORIES, type Memory } from '@/data/memories';
 
 const FOCUSED_VISUAL_RADIUS = 1.6; // all focused globes reach this world-space radius
 
+// Each globe gets its own pitch — pentatonic, warm
+const GLOBE_PITCHES: Record<string, [number, number]> = {
+  family:     [220.0, 440.0],  // A3→A4 — warm, rooted
+  wedding:    [261.6, 523.2],  // C4→C5 — bright, celebratory
+  discipline: [164.8, 329.6],  // E3→E4 — grounded, sharp
+  christmas:  [293.7, 587.3],  // D4→D5 — festive
+  birthday:   [329.6, 659.3],  // E4→E5 — joyful
+  systems:    [196.0, 392.0],  // G3→G4 — clear, logical
+  reflection: [246.9, 493.9],  // B3→B4 — introspective
+  growth:     [369.9, 739.9],  // F#4→F#5 — striving
+  '2024':     [440.0, 880.0],  // A4→A5 — present
+  '2023':     [392.0, 784.0],  // G4→G5 — recent past
+  '2022':     [349.2, 698.5],  // F4→F5 — further back
+};
+
 // ─── Lat-Long Grid ────────────────────────────────────────────────────────────
 
 interface GridTile {
@@ -407,6 +422,10 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
       // Leaving — set cooldown so the returning hitbox can't instantly re-trigger focus
       if (hoveredIdRef.current) {
         exitCooldown.current = { id: hoveredIdRef.current, until: Date.now() + 600 };
+        // Soft descending tone on exit
+        const ctx = ensureAudio();
+        const pitches = GLOBE_PITCHES[hoveredIdRef.current];
+        if (ctx && pitches) playTone(ctx, pitches[0] * 1.5, pitches[0] * 0.8, 0.28, 0.04);
       }
       hoveredIdRef.current = null;
       setHoveredLabel(null);
@@ -415,8 +434,12 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
       if (exitCooldown.current?.id === id && Date.now() < exitCooldown.current.until) return;
       hoveredIdRef.current = id;
       setHoveredLabel(id);
+      // Globe-specific rising tone on focus
+      const ctx = ensureAudio();
+      const pitches = GLOBE_PITCHES[id];
+      if (ctx && pitches) playTone(ctx, pitches[0], pitches[1], 0.4, 0.06);
     }
-  }, []);
+  }, [ensureAudio]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const gid = hoveredIdRef.current;
