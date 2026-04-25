@@ -9,6 +9,10 @@ import { KernelSize } from 'postprocessing';
 import { GLOBE_DEFS, GLOBE_CONNECTIONS, type GlobeDef } from '@/data/globes';
 import { MEMORIES, type Memory } from '@/data/memories';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const FOCUSED_VISUAL_RADIUS = 1.6; // all focused globes reach this world-space radius
+
 // ─── Lat-Long Grid ────────────────────────────────────────────────────────────
 
 interface GridTile {
@@ -103,14 +107,12 @@ interface TileProps {
 
 const PhotoTile = memo(function PhotoTile({ tile, texture, memory, globeActiveRef, onSelect }: TileProps) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const hovRef = useRef(false);
 
   useFrame(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
     const mat = mesh.material as THREE.MeshBasicMaterial;
-    const active = globeActiveRef.current;
-    mat.opacity = THREE.MathUtils.lerp(mat.opacity, active ? (hovRef.current ? 1.0 : 0.88) : 0.55, 0.1);
+    mat.opacity = THREE.MathUtils.lerp(mat.opacity, globeActiveRef.current ? 0.92 : 0.55, 0.1);
   });
 
   return (
@@ -118,9 +120,7 @@ const PhotoTile = memo(function PhotoTile({ tile, texture, memory, globeActiveRe
       ref={meshRef}
       position={tile.pos}
       quaternion={tile.quat}
-      // NO stopPropagation on hover — must bubble to Globe group
-      onPointerOver={() => { hovRef.current = true; }}
-      onPointerOut={() => { hovRef.current = false; }}
+      // Tiles handle clicks only — hover detection is on the invisible sphere hitbox
       onClick={(e) => { e.stopPropagation(); onSelect(memory); }}
     >
       <planeGeometry args={[tile.w, tile.h]} />
@@ -131,7 +131,19 @@ const PhotoTile = memo(function PhotoTile({ tile, texture, memory, globeActiveRe
 
 // ─── Single Globe ─────────────────────────────────────────────────────────────
 
-interface DragState { active: boolean; globeId: string | null; lastX: number; lastY: number; velX: number; velY: number; accDX: number; accDY: number; }
+interface DragState {
+  active: boolean;
+  globeId: string | null;
+  lastX: number;
+  lastY: number;
+  velX: number;
+  velY: number;
+  accDX: number;
+  accDY: number;
+}
+
+// Per-globe momentum store — keyed by globe id
+type MomentumStore = Record<string, { velX: number; velY: number }>;
 
 interface GlobeProps {
   def: GlobeDef;
@@ -139,28 +151,33 @@ interface GlobeProps {
   memories: Memory[];
   hoveredIdRef: React.MutableRefObject<string | null>;
   dragRef: React.MutableRefObject<DragState>;
+  momentumRef: React.MutableRefObject<MomentumStore>;
   onSelect: (m: Memory) => void;
   onHoverChange: (id: string | null) => void;
 }
 
-const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragRef, onSelect, onHoverChange }: GlobeProps) {
+const Globe = memo(function Globe({
+  def, textures, memories, hoveredIdRef, dragRef, momentumRef, onSelect, onHoverChange,
+}: GlobeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const t = useRef(Math.random() * 100);
-  const activeRef = useRef(false); // shared with PhotoTile for opacity
+  const activeRef = useRef(false);
 
   const tiles = useMemo(() => buildLatLongGrid(def.radius), [def.radius]);
   const basePos = useMemo(() => new THREE.Vector3(...def.position), [def.position]);
-
-  // Set initial position imperatively — never via prop, so React re-renders can't reset it
-  // Orbital params derived from XZ position
-  const orbR    = useMemo(() => Math.sqrt(basePos.x ** 2 + basePos.z ** 2), [basePos]);
+  const orbR     = useMemo(() => Math.sqrt(basePos.x ** 2 + basePos.z ** 2), [basePos]);
   const orbPhase = useMemo(() => Math.atan2(basePos.z, basePos.x), [basePos]);
+
+  // Normalize focus scale: all focused globes reach FOCUSED_VISUAL_RADIUS world units
+  const focusedScale = FOCUSED_VISUAL_RADIUS / def.radius;
 
   useEffect(() => {
     if (groupRef.current) {
       groupRef.current.position.set(basePos.x, basePos.y, basePos.z);
     }
-  }, [basePos]);
+    // Init momentum slot
+    momentumRef.current[def.id] = { velX: 0, velY: 0 };
+  }, [basePos, def.id, momentumRef]);
 
   useFrame((_, delta) => {
     const g = groupRef.current;
@@ -171,43 +188,47 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
     const anyHovered = hoveredIdRef.current !== null;
     activeRef.current = isHovered;
 
-    // Scale — normalize so ALL hovered globes hit the same visual size (radius 1.6 world units)
-    const targetScale = isHovered ? (1.6 / def.radius) : (anyHovered ? 0.72 : 1.0);
-    g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, targetScale, 0.08));
+    // Scale — all focused globes reach the same absolute visual size
+    const targetScale = isHovered ? focusedScale : (anyHovered ? 0.72 : 1.0);
+    g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, targetScale, 0.09));
 
-    // Orbital position — orbit the world center on XZ plane
+    // Position
     const angle = t.current * def.orbitSpeed + orbPhase;
     const orbX = Math.cos(angle) * orbR;
     const orbZ = Math.sin(angle) * orbR;
-
-    // Float — independent breathing on Y
     const fy = 0.20 * Math.sin(t.current * 0.38 + orbPhase * 1.3);
 
     if (isHovered) {
-      // Hovered: snap to screen center, stop orbiting and floating
       g.position.x = THREE.MathUtils.lerp(g.position.x, 0, 0.07);
       g.position.y = THREE.MathUtils.lerp(g.position.y, 0, 0.07);
       g.position.z = THREE.MathUtils.lerp(g.position.z, 3.2, 0.07);
     } else {
-      // Others keep orbiting normally, pushed slightly back when something is focused
       g.position.x = orbX;
       g.position.y = basePos.y + fy;
       g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + (anyHovered ? -1.2 : 0), 0.05);
     }
 
-    // Rotation: drag > momentum coast > auto-spin
+    // Rotation — each globe has its own isolated momentum
+    const mom = momentumRef.current[def.id] ?? { velX: 0, velY: 0 };
     const drag = dragRef.current;
+
     if (drag.active && drag.globeId === def.id) {
+      // This is the actively-dragged globe
       g.rotation.y += drag.accDX;
       g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + drag.accDY, -1.1, 1.1);
+      // Capture velocity for momentum when drag ends
+      mom.velX = drag.accDX;
+      mom.velY = drag.accDY;
       drag.accDX = 0;
       drag.accDY = 0;
-    } else if (drag.globeId === def.id && Math.abs(drag.velX) + Math.abs(drag.velY) > 0.0003) {
-      g.rotation.y += drag.velX;
-      g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + drag.velY, -1.1, 1.1);
-      drag.velX *= 0.92;
-      drag.velY *= 0.92;
+    } else if (drag.globeId === def.id && (Math.abs(mom.velX) + Math.abs(mom.velY) > 0.0003)) {
+      // Coast with momentum — ONLY for the globe that was dragged
+      g.rotation.y += mom.velX;
+      g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + mom.velY, -1.1, 1.1);
+      mom.velX *= 0.92;
+      mom.velY *= 0.92;
     } else {
+      // Auto-spin — all non-dragged globes
       g.rotation.y += delta * 0.055;
       g.rotation.x += delta * 0.018;
     }
@@ -216,13 +237,17 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
   const hasPhotos = memories.length > 0 && textures.length > 0;
 
   return (
-    <group
-      ref={groupRef}
-      onPointerOver={(e) => { e.stopPropagation(); if (hoveredIdRef.current !== null && hoveredIdRef.current !== def.id) return; onHoverChange(def.id); }}
-      onPointerOut={(e)  => { e.stopPropagation(); onHoverChange(null); }}
-      onClick={(e) => { e.stopPropagation(); }}
+    <group ref={groupRef}>
+      {/* ── Invisible sphere hitbox — solid so it blocks raycasts through tile gaps ── */}
+      <mesh
+        onPointerEnter={(e) => { e.stopPropagation(); onHoverChange(def.id); }}
+        onPointerLeave={(e) => { e.stopPropagation(); onHoverChange(null); }}
+      >
+        <sphereGeometry args={[def.radius * 1.05, 24, 24]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
 
-    >
+      {/* ── Photo tiles (click only, hover handled by hitbox sphere) ── */}
       {hasPhotos
         ? tiles.map((tile, i) => (
             <PhotoTile
@@ -235,7 +260,6 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
             />
           ))
         : (
-            // Empty globe — subtle glow sphere (no photos yet)
             <mesh>
               <sphereGeometry args={[def.radius, 32, 32]} />
               <meshBasicMaterial color={def.color} transparent opacity={0.18} wireframe />
@@ -249,10 +273,11 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
 // ─── Globe System ─────────────────────────────────────────────────────────────
 
 const GlobeSystem = memo(function GlobeSystem({
-  hoveredIdRef, dragRef, onSelect, onHoverChange,
+  hoveredIdRef, dragRef, momentumRef, onSelect, onHoverChange,
 }: {
   hoveredIdRef: React.MutableRefObject<string | null>;
   dragRef: React.MutableRefObject<DragState>;
+  momentumRef: React.MutableRefObject<MomentumStore>;
   onSelect: (m: Memory) => void;
   onHoverChange: (id: string | null) => void;
 }) {
@@ -278,6 +303,7 @@ const GlobeSystem = memo(function GlobeSystem({
           memories={globeMemories[i]}
           hoveredIdRef={hoveredIdRef}
           dragRef={dragRef}
+          momentumRef={momentumRef}
           onSelect={onSelect}
           onHoverChange={onHoverChange}
         />
@@ -311,9 +337,13 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const mouse = useRef<[number, number]>([0, 0]);
   const hoveredIdRef = useRef<string | null>(null);
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
-  const dragRef = useRef<DragState>({ active: false, globeId: null, lastX: 0, lastY: 0, velX: 0, velY: 0, accDX: 0, accDY: 0 });
+  const dragRef = useRef<DragState>({
+    active: false, globeId: null, lastX: 0, lastY: 0,
+    velX: 0, velY: 0, accDX: 0, accDY: 0,
+  });
+  // Per-globe momentum — isolated so dragging one globe never affects others
+  const momentumRef = useRef<MomentumStore>({});
 
-  // Decouple: ref update (for useFrame) vs state update (for DOM labels)
   const handleHoverChange = useCallback((id: string | null) => {
     hoveredIdRef.current = id;
     setHoveredLabel(id);
@@ -326,6 +356,10 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
     d.active = true; d.globeId = gid;
     d.lastX = e.clientX; d.lastY = e.clientY;
     d.velX = 0; d.velY = 0; d.accDX = 0; d.accDY = 0;
+    // Reset this globe's momentum when a new drag starts
+    if (momentumRef.current[gid]) {
+      momentumRef.current[gid] = { velX: 0, velY: 0 };
+    }
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -344,7 +378,13 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   }, []);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', cursor: dragRef.current.active ? 'grabbing' : 'default' }} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+    <div
+      style={{ width: '100%', height: '100%', position: 'relative', cursor: 'default' }}
+      onMouseMove={handleMouseMove}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       <Canvas
         camera={{ position: [0, 0, 7.5], fov: 50, near: 0.1, far: 80 }}
         gl={{ antialias: true, alpha: true }}
@@ -356,6 +396,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
           <GlobeSystem
             hoveredIdRef={hoveredIdRef}
             dragRef={dragRef}
+            momentumRef={momentumRef}
             onSelect={onSelect}
             onHoverChange={handleHoverChange}
           />
@@ -366,7 +407,6 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
         </EffectComposer>
       </Canvas>
 
-      {/* DOM labels — only these re-render on hover */}
       {GLOBE_DEFS.map(def => (
         <div
           key={def.id}
