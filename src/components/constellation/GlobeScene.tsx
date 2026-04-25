@@ -162,6 +162,7 @@ const Globe = memo(function Globe({
   const groupRef = useRef<THREE.Group>(null);
   const t = useRef(Math.random() * 100);
   const activeRef = useRef(false);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tiles = useMemo(() => buildLatLongGrid(def.radius), [def.radius]);
   const basePos = useMemo(() => new THREE.Vector3(...def.position), [def.position]);
@@ -240,8 +241,8 @@ const Globe = memo(function Globe({
     <group ref={groupRef}>
       {/* ── Invisible sphere hitbox — solid so it blocks raycasts through tile gaps ── */}
       <mesh
-        onPointerEnter={(e) => { e.stopPropagation(); onHoverChange(def.id); }}
-        onPointerLeave={(e) => { e.stopPropagation(); onHoverChange(null); }}
+        onPointerEnter={(e) => { e.stopPropagation(); if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; } onHoverChange(def.id); }}
+        onPointerLeave={(e) => { e.stopPropagation(); leaveTimer.current = setTimeout(() => { leaveTimer.current = null; onHoverChange(null); }, 50); }}
       >
         <sphereGeometry args={[def.radius * 1.05, 24, 24]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
