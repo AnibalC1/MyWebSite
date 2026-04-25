@@ -135,8 +135,6 @@ const PhotoTile = memo(function PhotoTile({ tile, texture, memory, globeActiveRe
       ref={meshRef}
       position={tile.pos}
       quaternion={tile.quat}
-      // Tiles: click only. Invisible to raycaster so only hitbox sphere fires hover events.
-      raycast={() => null}
       onClick={(e) => { e.stopPropagation(); onSelect(memory); }}
     >
       <planeGeometry args={[tile.w, tile.h]} />
@@ -257,6 +255,19 @@ const Globe = memo(function Globe({
     <group ref={groupRef}>
       {/* ── Invisible sphere hitbox — solid so it blocks raycasts through tile gaps ── */}
       <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          if (memories.length === 0) return;
+          // find tile whose position direction is closest to the click point on the sphere
+          const local = groupRef.current!.worldToLocal(e.point.clone());
+          const dir = local.normalize();
+          let best = 0, bestDot = -Infinity;
+          tiles.forEach((tile, i) => {
+            const d = tile.pos.clone().normalize().dot(dir);
+            if (d > bestDot) { bestDot = d; best = i; }
+          });
+          onSelect(memories[best % memories.length]);
+        }}
         onPointerEnter={(e) => { e.stopPropagation(); if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; } onHoverChange(def.id); }}
         onPointerLeave={(e) => { e.stopPropagation(); leaveTimer.current = setTimeout(() => { leaveTimer.current = null; if (hoveredIdRef.current === def.id) onHoverChange(null); }, 80); }}
       >
@@ -398,15 +409,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const ensureAudio = useCallback(() => {
     if (!audioCtxRef.current) {
       audioCtxRef.current = createAudioCtx();
-      if (audioCtxRef.current) {
-        // Resume on any future click too (browser may suspend after idle)
-        const resume = () => audioCtxRef.current?.state === 'suspended' && audioCtxRef.current.resume();
-        document.addEventListener('click', resume);
-        document.addEventListener('touchstart', resume);
-        audioCtxRef.current.resume().then(() => {
-          if (audioCtxRef.current) ambientStopRef.current = startAmbient(audioCtxRef.current);
-        });
-      }
+      if (audioCtxRef.current) ambientStopRef.current = startAmbient(audioCtxRef.current);
     } else if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
@@ -450,7 +453,6 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   }, [ensureAudio]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    ensureAudio(); // initialize AudioContext on first user gesture (browser policy)
     const gid = hoveredIdRef.current;
     if (!gid) {
       isDragging.current = true;
