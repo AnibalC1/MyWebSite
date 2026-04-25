@@ -372,6 +372,14 @@ const PHOTOS = [
   '/images/photo-ayyg-christmas-son.jpg',
   '/images/photo-oq31-family-selfie.jpg',
   '/images/photo-5dif-christmas-tory.jpg',
+  '/images/usb-IMG_0091.JPG',
+  '/images/usb-IMG_0092.JPG',
+  '/images/usb-IMG_0093.JPG',
+  '/images/usb-IMG_0094.JPG',
+  '/images/usb-IMG_0121.JPG',
+  '/images/usb-IMG_0151.JPG',
+  '/images/usb-IMG_0200.JPG',
+  '/images/usb-IMG_0230.JPG',
 ];
 
 function ClusterPanel({
@@ -509,7 +517,7 @@ export default function WorldAtlasGlobe() {
         gl={{ antialias: true, alpha: true }}
         style={{ position: 'absolute', inset: 0 }}
         dpr={[1, 2]}
-        onClick={() => setSelectedId(null)}
+        onPointerMissed={() => setSelectedId(null)}
       >
         <ambientLight intensity={0.15} />
         <pointLight position={[10, 10, 10]} intensity={0.4} color="#4488ff" />
