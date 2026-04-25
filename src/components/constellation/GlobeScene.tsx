@@ -144,6 +144,7 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
   const groupRef = useRef<THREE.Group>(null);
   const t = useRef(Math.random() * 100);
   const activeRef = useRef(false); // shared with PhotoTile for opacity
+  const dragRef = useRef({ active: false, lastX: 0, lastY: 0, velX: 0, velY: 0, accDX: 0, accDY: 0 });
   const tiles = useMemo(() => buildLatLongGrid(def.radius), [def.radius]);
   const basePos = useMemo(() => new THREE.Vector3(...def.position), [def.position]);
 
@@ -190,9 +191,22 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
       g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + (anyHovered ? -0.6 : 0), 0.05);
     }
 
-    // Slow spin on own axis
-    g.rotation.y += delta * 0.055;
-    g.rotation.x += delta * 0.018;
+    // Rotation: drag > momentum coast > auto-spin
+    const drag = dragRef.current;
+    if (isHovered && drag.active) {
+      g.rotation.y += drag.accDX;
+      g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + drag.accDY, -1.1, 1.1);
+      drag.accDX = 0;
+      drag.accDY = 0;
+    } else if (Math.abs(drag.velX) + Math.abs(drag.velY) > 0.0003) {
+      g.rotation.y += drag.velX;
+      g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + drag.velY, -1.1, 1.1);
+      drag.velX *= 0.92;
+      drag.velY *= 0.92;
+    } else {
+      g.rotation.y += delta * 0.055;
+      g.rotation.x += delta * 0.018;
+    }
   });
 
   const hasPhotos = memories.length > 0 && textures.length > 0;
@@ -203,6 +217,25 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
       onPointerOver={(e) => { e.stopPropagation(); onHoverChange(def.id); }}
       onPointerOut={(e)  => { e.stopPropagation(); onHoverChange(null); }}
       onClick={(e) => { e.stopPropagation(); }}
+      onPointerDown={(e) => {
+        if (hoveredIdRef.current !== def.id) return;
+        e.stopPropagation();
+        (e.target as Element).setPointerCapture(e.pointerId);
+        const d = dragRef.current;
+        d.active = true; d.lastX = e.clientX; d.lastY = e.clientY;
+        d.velX = 0; d.velY = 0; d.accDX = 0; d.accDY = 0;
+      }}
+      onPointerMove={(e) => {
+        const d = dragRef.current;
+        if (!d.active) return;
+        const dx = (e.clientX - d.lastX) * 0.013;
+        const dy = (e.clientY - d.lastY) * 0.009;
+        d.lastX = e.clientX; d.lastY = e.clientY;
+        d.accDX += dx; d.accDY += dy;
+        d.velX = dx; d.velY = dy;
+      }}
+      onPointerUp={() => { dragRef.current.active = false; }}
+      onPointerCancel={() => { dragRef.current.active = false; }}
     >
       {hasPhotos
         ? tiles.map((tile, i) => (
