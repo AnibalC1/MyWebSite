@@ -72,6 +72,7 @@ export default function Home() {
         <div style={{ display: 'flex', gap: '2.4rem', pointerEvents: 'auto' }}>
           {[
             { label: 'Home', href: '/' },
+            { label: 'Videos', href: '/videos' },
             { label: 'About', href: '/about' },
             { label: 'Builds', href: '/builds' },
             { label: 'Contact', href: '/contact' },
