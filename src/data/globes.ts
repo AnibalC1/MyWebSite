@@ -27,3 +27,5 @@ export const GLOBE_DEFS: GlobeDef[] = [
   { id: '2023',       label: '2023',       color: '#a8c98c', position: [ 0.8,  0.9,  1.0],  radius: 0.72, orbitSpeed: 0.18 },
   { id: '2022',       label: '2022',       color: '#8cb0c9', position: [-1.1, -1.0,  0.5],  radius: 0.72, orbitSpeed: 0.22 },
 ];
+
+export const GLOBE_CONNECTIONS: [string, string][] = [];
