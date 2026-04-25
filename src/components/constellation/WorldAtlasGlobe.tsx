@@ -29,6 +29,7 @@ const _euler = new THREE.Euler();
 const _wPos  = new THREE.Vector3();    // scratch world position
 const _wSurf = new THREE.Vector3();    // scratch surface position
 const _col   = new THREE.Color();
+const _clusterTgt = new THREE.Vector3();  // scratch cluster target
 const _tintCol  = new THREE.Color(0.55, 0.82, 1.0); // cyan holographic at rest
 const _clearCol = new THREE.Color(1, 1, 1);          // full color on hover
 
@@ -152,6 +153,10 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   const rotZs   =useRef(new Float32Array(N).fill(0));
   const tintTs  =useRef(new Float32Array(N).fill(0));   // 0=tinted, 1=full color
   const bobs    =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
+  // Cluster state — target positions for time-related photos on hover
+  const clusterTgts =useRef<THREE.Vector3[]>(PHOTOS.map(()=>new THREE.Vector3()));
+  const prevHovRef  =useRef(-1);
+  const tiIdxsRef   =useRef<number[]>([]); // indices of time-related photos for current hover
 
   // Texture loading
   useEffect(()=>{
@@ -177,6 +182,38 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
     const anyHov=h>=0, anySel=s>=0;
     const connSet=anySel?new Set(CONNS[s].map(c=>c.toIdx)):new Set<number>();
 
+    // ── Recompute cluster targets when hover changes
+    if(h !== prevHovRef.current){
+      prevHovRef.current=h;
+      tiIdxsRef.current=[];
+      if(h>=0){
+        const hovTs=PHOTOS[h].ts;
+        // Find all photos within ±30 days, sort by |ts delta|, cap at 30
+        const related=[];
+        for(let j=0;j<N;j++){
+          if(j===h)continue;
+          const dt=Math.abs(PHOTOS[j].ts-hovTs);
+          if(dt<=THIRTY_DAYS)related.push({j,dt});
+        }
+        related.sort((a,b)=>a.dt-b.dt);
+        const capped=related.slice(0,30);
+        tiIdxsRef.current=capped.map(r=>r.j);
+        // Pre-compute cluster offsets in world space using fibonacci mini-sphere
+        const cnt=capped.length;
+        const phiG=Math.PI*(3-Math.sqrt(5));
+        // We'll update these each frame relative to hovered mesh — store offsets only
+        capped.forEach(({j},k)=>{
+          const y=1-(k/Math.max(cnt-1,1))*2;
+          const r=Math.sqrt(Math.max(0,1-y*y));
+          const theta=phiG*k;
+          const radius=0.35;
+          clusterTgts.current[j].set(r*Math.cos(theta)*radius, y*radius, r*Math.sin(theta)*radius);
+        });
+      }
+    }
+    const tiSet=new Set(tiIdxsRef.current);
+    const hovMesh=h>=0?meshRefs.current[h]:null;
+
     // Get globe world quaternion once
     if(globeRef.current) globeRef.current.getWorldQuaternion(_gQ);
     else _gQ.identity();
@@ -190,19 +227,21 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       const iAmHov=i===h, iAmSel=i===s, iAmConn=connSet.has(i);
 
       // ── Scale target
+      const iAmTi=tiSet.has(i);
       let tSc:number;
-      if(iAmHov||iAmSel) tSc=0.18;          // ~1.5× the base 0.12
+      if(iAmHov||iAmSel) tSc=0.18;          // ~1.5× base
       else if(iAmConn) tSc=0.135;
+      else if(iAmTi) tSc=0.132;             // 1.1× base — time-clustered
       else if(anyHov||anySel) tSc=0.09;
       else tSc=0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
       // ── Opacity target
-      const tOp=(iAmHov||iAmSel)?1.0:iAmConn?0.80:(anyHov||anySel)?0.10:0.48;
+      const tOp=(iAmHov||iAmSel)?1.0:iAmConn?0.80:iAmTi?0.85:(anyHov||anySel)?0.08:0.48;
       opacs.current[i]+=(tOp-opacs.current[i])*Math.min(delta*9,1);
 
       // ── Tint target (0=cyan holographic, 1=full color)
-      const tTint=(iAmHov||iAmSel)?1:iAmConn?0.5:0;
+      const tTint=(iAmHov||iAmSel)?1:iAmConn?0.5:iAmTi?1:0;
       tintTs.current[i]+=(tTint-tintTs.current[i])*Math.min(delta*9,1);
 
       // ── Cinematic rotation — spring back to 0
@@ -222,7 +261,14 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      mesh.position.copy(_wPos);
+      // ── Position: cluster time-related photos around hovered photo
+      if(anyHov && iAmTi && hovMesh){
+        // Offset is stored as displacement from hovered mesh center
+        _clusterTgt.copy(hovMesh.position).add(clusterTgts.current[i]);
+        mesh.position.lerp(_clusterTgt, Math.min(delta*3.5,1));
+      } else {
+        mesh.position.lerp(_wPos, Math.min(delta*12,1));
+      }
       mesh.scale.setScalar(scales.current[i]);
 
       // ── Billboard: face camera (world-space mesh, no parent transform)
