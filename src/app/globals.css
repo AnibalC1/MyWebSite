@@ -91,3 +91,14 @@ body {
   80% { transform: translate(2%,28%); }
   90% { transform: translate(-8%,8%); }
 }
+
+/* ── Logo inner 3D spin ─────────────────────────────────── */
+@keyframes spinInner {
+  from { transform: perspective(400px) rotateY(0deg); }
+  to   { transform: perspective(400px) rotateY(360deg); }
+}
+.logo-inner-spin {
+  animation: spinInner 10s linear infinite;
+  transform-origin: 50% 46%;
+  transform-style: preserve-3d;
+}

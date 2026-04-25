@@ -127,11 +127,34 @@ export default function Home() {
         }}
       >
         <Link href="/" style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center' }}>
-          <img
-            src="/logo.png"
-            alt="Anibal Cabral"
-            style={{ height: '90px', width: 'auto', filter: 'drop-shadow(0 0 10px rgba(201,168,76,0.6))' }}
-          />
+          {/* Logo: static outer + 3D spinning AR monogram inside */}
+          <div style={{ position: 'relative', height: '180px', display: 'inline-block' }}>
+            {/* Spinning inner — clipped to the AR circle */}
+            <img
+              src="/logo.png"
+              alt=""
+              aria-hidden
+              className="logo-inner-spin"
+              style={{
+                position: 'absolute', top: 0, left: 0,
+                height: '180px', width: 'auto',
+                clipPath: 'circle(21% at 50% 46%)',
+                filter: 'drop-shadow(0 0 14px rgba(201,168,76,0.9))',
+              }}
+            />
+            {/* Static outer — mask hides the center so spin shows through */}
+            <img
+              src="/logo.png"
+              alt="Anibal Cabral"
+              style={{
+                height: '180px', width: 'auto',
+                position: 'relative', zIndex: 1,
+                filter: 'drop-shadow(0 0 10px rgba(201,168,76,0.5))',
+                WebkitMaskImage: 'radial-gradient(circle 21% at 50% 46%, transparent 95%, black 100%)',
+                maskImage: 'radial-gradient(circle 21% at 50% 46%, transparent 95%, black 100%)',
+              }}
+            />
+          </div>
         </Link>
         <div style={{ display: 'flex', gap: '2.4rem', pointerEvents: 'auto' }}>
           {[
