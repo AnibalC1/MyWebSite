@@ -27,15 +27,15 @@ const PHOTOS = PHOTO_DATA as PhotoEntry[];
 const R = 2.4;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399 rad
 const MAX_SPREAD: Record<string, number> = {
-  worcester:   0.75,
-  'nyc-nj':    0.50,
-  manchester:  0.20,
-  cancun:      0.22,
-  houston:     0.18,
-  boston:      0.18,
-  scranton:    0.15,
-  springfield: 0.12,
-  other:       0.10,
+  worcester:   2.2,
+  'nyc-nj':    1.5,
+  manchester:  0.6,
+  cancun:      0.7,
+  houston:     0.6,
+  boston:      0.6,
+  scranton:    0.5,
+  springfield: 0.4,
+  other:       0.3,
 };
 const CLUSTER_ANCHORS: Record<string, [number, number]> = {
   worcester:   [42.5, -71.8],
@@ -117,7 +117,7 @@ function computePhotoPositions(): PhotoPos[] {
       const baseVec = latLonToVec3(p.lat, p.lng, R);
       const spreadVec = baseVec.clone().add(tangentOffset).normalize();
 
-      const radialOffset = 0.18 + (i % 7) * 0.04; // 0.18 – 0.42
+      const radialOffset = 0.32 + (i % 9) * 0.07; // 0.32 – 0.88
       const localPos = spreadVec.clone().multiplyScalar(R + radialOffset);
       const surfacePos = spreadVec.clone().multiplyScalar(R + 0.01);
 
@@ -310,7 +310,7 @@ function FloatingHolograms() {
   const matRefs    = useRef<(THREE.SpriteMaterial | null)[]>(PHOTOS.map(() => null));
 
   // Current animated values
-  const scales     = useRef<Float32Array>(new Float32Array(PHOTOS.length).fill(0.12));
+  const scales     = useRef<Float32Array>(new Float32Array(PHOTOS.length).fill(0.14));
   const opacities  = useRef<Float32Array>(new Float32Array(PHOTOS.length).fill(0.55));
 
   // Hover state (ref, not state — no re-render)
@@ -397,12 +397,12 @@ function FloatingHolograms() {
       if (h < 0) {
         // Nothing hovered
         targetOp = 0.55;
-        targetSc = 0.12;
+        targetSc = 0.14;
         targetTint = 0;
       } else if (i === h) {
         // Hovered photo
         targetOp   = 1.0;
-        targetSc   = 0.30; // ~2.5× base
+        targetSc   = 0.38; // ~2.5× base
         targetTint = 1;    // show real photo colors
       } else if (relSet.has(i)) {
         // Related photo
@@ -412,7 +412,7 @@ function FloatingHolograms() {
       } else {
         // Unrelated — dim
         targetOp   = 0.22;
-        targetSc   = 0.10;
+        targetSc   = 0.11;
         targetTint = 0;
       }
 
@@ -492,7 +492,7 @@ function FloatingHolograms() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ref={(el: any) => { spriteRefs.current[i] = el; }}
           position={PHOTO_POSITIONS[i].localPos}
-          scale={[0.12, 0.09, 1]}
+          scale={[0.14, 0.105, 1]}
           renderOrder={7}
           onPointerOver={handleOver(i)}
           onPointerOut={handleOut}
