@@ -156,8 +156,9 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   const tintTs  =useRef(new Float32Array(N).fill(0));   // 0=tinted, 1=full color
   const bobs    =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
   // Cluster state — ring layout (no orbit drift, computed once per hover change)
-  const ringAngles  =useRef(new Float32Array(N).fill(0));  // angle on ring per photo
-  const ringRadii   =useRef(new Float32Array(N).fill(0));  // radius (0 = not in cluster)
+  const ringAngles      =useRef(new Float32Array(N).fill(0));  // angle on ring per photo
+  const ringRadii       =useRef(new Float32Array(N).fill(0));  // radius (0 = not in cluster)
+  const stableScreenCtr =useRef(new THREE.Vector3());            // screen center locked at hover-start
   const prevHovRef  =useRef(-1);
   const prevSelRef  =useRef(-1);
   const tiIdxsRef   =useRef<number[]>([]);
@@ -213,14 +214,16 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         const inner=capped.slice(0,Math.min(capped.length,INNER_MAX));
         const outer=capped.slice(INNER_MAX,Math.min(capped.length,INNER_MAX+16));
         ringAngles.current.fill(0); ringRadii.current.fill(0);
+        // Lock screen center now — stable for this entire hover session
+        stableScreenCtr.current.copy(_V6_LOCAL).applyMatrix4(camera.matrixWorld);
         inner.forEach(({j},k)=>{
           ringAngles.current[j]=(k/inner.length)*Math.PI*2;
-          ringRadii.current[j]=0.32;  // world units at ~1.4 from camera
+          ringRadii.current[j]=0.50;  // larger — fits photos at same scale as center
         });
         const outerStep=outer.length>0?Math.PI/outer.length:0;
         outer.forEach(({j},k)=>{
           ringAngles.current[j]=(k/outer.length)*Math.PI*2+outerStep;
-          ringRadii.current[j]=0.52;
+          ringRadii.current[j]=0.85;
         });
       }
     }
@@ -236,9 +239,6 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
 
     const t=performance.now()/1000;
 
-    // Screen-center world point — hovered photo flies here, cluster ring forms here
-    _screenCtr.copy(_V6_LOCAL).applyMatrix4(camera.matrixWorld);
-
     for(let i=0;i<N;i++){
       const mesh=meshRefs.current[i];const mat=matRefs.current[i];
       if(!mesh||!mat)continue;
@@ -248,10 +248,10 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       // ── Scale target
       const iAmTi=tiSet.has(i);
       let tSc:number;
-      if(iAmHov||iAmSel) tSc=0.18;                           // 1.5× anchor
+      if(iAmHov||iAmSel) tSc=0.18;        // center anchor
       else if(iAmConn) tSc=0.135;
-      else if(iAmTi) tSc=isClickedCluster?0.156:0.096;       // click=1.3×, hover=0.8×
-      else if(anyActive) tSc=0.12;                            // unrelated stay same size, just dim
+      else if(iAmTi) tSc=isClickedCluster?0.22:0.18;  // same size as center; bigger on click
+      else if(anyActive) tSc=0.12;
       else tSc=0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
@@ -280,16 +280,17 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      // ── Position: hovered → screen center; cluster → ring around screen center
+      // ── Position: hovered → stable screen center; cluster → ring around it
+      const sc=stableScreenCtr.current;
       if(iAmHov||iAmSel){
-        mesh.position.lerp(_screenCtr, Math.min(delta*6,1));
+        mesh.position.lerp(sc, Math.min(delta*6,1));
       } else if(anyActive && iAmTi && ringRadii.current[i]>0){
         const ang=ringAngles.current[i];
         const rad=ringRadii.current[i]*(isClickedCluster?0.60:1.0);
         _clusterTgt.set(
-          _screenCtr.x+Math.cos(ang)*rad,
-          _screenCtr.y+Math.sin(ang)*rad,
-          _screenCtr.z
+          sc.x+Math.cos(ang)*rad,
+          sc.y+Math.sin(ang)*rad,
+          sc.z+0.15            // slightly in front of center photo — never obscured
         );
         mesh.position.lerp(_clusterTgt, Math.min(delta*5,1));
       } else {
