@@ -52,27 +52,21 @@ function tangentFrame(lat:number,lng:number):[THREE.Vector3,THREE.Vector3]{
 }
 
 // ─── Pre-compute positions ────────────────────────────────────────────────────
-const MAX_SPREAD:Record<string,number>={worcester:2.2,'nyc-nj':1.5,manchester:0.6,cancun:0.7,houston:0.6,boston:0.6,scranton:0.5,springfield:0.4,other:0.3};
-const ANCHORS:Record<string,[number,number]>={worcester:[42.5,-71.8],'nyc-nj':[40.7,-74.0],manchester:[42.9,-71.5],cancun:[21.2,-86.8],houston:[29.8,-95.4],boston:[42.4,-71.1],scranton:[41.4,-75.6],springfield:[42.1,-72.6],other:[40.0,-75.0]};
-
+// ─── Fibonacci sphere distribution — evenly covers entire globe ───────────────
 interface PPos { base:THREE.Vector3; surf:THREE.Vector3; }
 const PPOS:PPos[] = (()=>{
-  const byCl=new Map<string,number[]>();
-  PHOTOS.forEach((p,i)=>{const a=byCl.get(p.cluster)??[];a.push(i);byCl.set(p.cluster,a);});
-  const res:PPos[]=new Array(N);
-  byCl.forEach((idxs,cl)=>{
-    const anch=ANCHORS[cl]??[PHOTOS[idxs[0]].lat,PHOTOS[idxs[0]].lng];
-    const [t1,t2]=tangentFrame(anch[0],anch[1]);
-    const sp=MAX_SPREAD[cl]??0.3,Ni=idxs.length;
-    idxs.forEach((idx,i)=>{
-      const sR=Math.sqrt(i/Ni)*sp,sT=i*GOLDEN_ANGLE;
-      const off=t1.clone().multiplyScalar(sR*Math.cos(sT)).add(t2.clone().multiplyScalar(sR*Math.sin(sT)));
-      const dir=ll2v(PHOTOS[idx].lat,PHOTOS[idx].lng,R).add(off).normalize();
-      const rOff=0.32+(i%9)*0.07;
-      res[idx]={base:dir.clone().multiplyScalar(R+rOff), surf:dir.clone().multiplyScalar(R+0.01)};
-    });
+  const gr=(1+Math.sqrt(5))/2;
+  return Array.from({length:N},(_,i)=>{
+    const theta=Math.acos(1-2*(i+0.5)/N);
+    const phi=2*Math.PI*i/gr;
+    const dir=new THREE.Vector3(
+      Math.sin(theta)*Math.cos(phi),
+      Math.cos(theta),
+      Math.sin(theta)*Math.sin(phi)
+    );
+    const rOff=0.32+(i%9)*0.07;
+    return{base:dir.clone().multiplyScalar(R+rOff),surf:dir.clone().multiplyScalar(R+0.01)};
   });
-  return res;
 })();
 
 // ─── Connections ──────────────────────────────────────────────────────────────
