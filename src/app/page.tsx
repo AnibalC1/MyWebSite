@@ -222,7 +222,7 @@ export default function Home() {
         <div style={{
           fontFamily: '"Cormorant Garamond", serif',
           fontWeight: 300,
-          fontSize: 'clamp(5rem, 15vw, 14rem)',
+          fontSize: 'clamp(2.8rem, 7vw, 6.5rem)',
           lineHeight: 0.88,
           color: '#ffffff',
           letterSpacing: '-0.01em',

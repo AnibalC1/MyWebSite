@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import type { Memory } from '@/data/memories';
+import Navigation from '@/components/layout/Navigation';
 
 const GlobeScene = dynamic(
   () => import('@/components/constellation/GlobeScene').then(m => ({ default: m.GlobeScene })),
@@ -40,63 +41,8 @@ export default function Home() {
         <GlobeScene onSelect={setSelected} />
       </div>
 
-      {/* Ghost nav */}
-      <motion.nav
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 2.2, duration: 1.0, ease: 'easeOut' }}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '1.6rem 2.8rem',
-          pointerEvents: 'none',
-        }}
-      >
-        <span style={{
-          fontFamily: '"Cormorant Garamond", serif',
-          fontSize: '1.05rem',
-          letterSpacing: '0.22em',
-          color: '#c9a84c',
-          textTransform: 'uppercase',
-          textShadow: '0 0 20px #c9a84c55',
-          pointerEvents: 'auto',
-        }}>
-          AC
-        </span>
-        <div style={{ display: 'flex', gap: '2.4rem', pointerEvents: 'auto' }}>
-          {[
-            { label: 'Home', href: '/' },
-            { label: 'Videos', href: '/videos' },
-            { label: 'About', href: '/about' },
-            { label: 'Builds', href: '/builds' },
-            { label: 'Contact', href: '/contact' },
-          ].map(({ label, href }) => (
-            <Link
-              key={href}
-              href={href}
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: '0.7rem',
-                letterSpacing: '0.2em',
-                color: 'rgba(255,255,255,0.45)',
-                textDecoration: 'none',
-                textTransform: 'uppercase',
-                transition: 'color 0.3s ease',
-              }}
-              onMouseOver={e => (e.currentTarget.style.color = '#c9a84c')}
-              onMouseOut={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
-      </motion.nav>
+      {/* Shared nav */}
+      <Navigation />
 
       {/* Hero tagline */}
       <motion.div

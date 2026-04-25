@@ -9,6 +9,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import Navigation from '@/components/layout/Navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Clip data ────────────────────────────────────────────────────────────────
@@ -429,42 +430,8 @@ export default function VideoTheater({ clips }: Props) {
       {/* ── Film grain canvas ────────────────────────────── */}
       <FilmGrain phase={phase} />
 
-      {/* ── Nav (minimal, top) ───────────────────────────── */}
-      <motion.nav
-        initial={{ opacity: 0 }}
-        animate={{ opacity: phase >= 4 ? 0.6 : 0 }}
-        transition={{ duration: 1 }}
-        style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '1.2rem 2rem', zIndex: 30,
-        }}
-      >
-        <a href="/" style={{
-          fontFamily: '"Cormorant Garamond", serif',
-          fontSize: '0.95rem', letterSpacing: '0.22em',
-          color: 'rgba(201,168,76,0.7)', textDecoration: 'none',
-          textTransform: 'uppercase',
-        }}>AC</a>
-        <div style={{ display: 'flex', gap: '1.8rem' }}>
-          {[
-            { href: '/',        label: 'Home'    },
-            { href: '/gallery', label: 'Gallery' },
-            { href: '/about',   label: 'About'   },
-            { href: '/builds',  label: 'Builds'  },
-          ].map(n => (
-            <a key={n.href} href={n.href} style={{
-              fontFamily: '"Cormorant Garamond", serif',
-              fontSize: '0.62rem', letterSpacing: '0.22em',
-              color: 'rgba(255,255,255,0.28)', textDecoration: 'none', textTransform: 'uppercase',
-              transition: 'color 0.3s',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.75)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.28)')}
-            >{n.label}</a>
-          ))}
-        </div>
-      </motion.nav>
+      {/* Shared nav */}
+      <Navigation />
 
       {/* ══════════════════════════════════════════════════════
           THE CAROUSEL STAGE
