@@ -120,7 +120,8 @@ const PhotoTile = memo(function PhotoTile({ tile, texture, memory, globeActiveRe
       ref={meshRef}
       position={tile.pos}
       quaternion={tile.quat}
-      // Tiles handle clicks only — hover detection is on the invisible sphere hitbox
+      // Tiles: click only. Invisible to raycaster so only hitbox sphere fires hover events.
+      raycast={() => null}
       onClick={(e) => { e.stopPropagation(); onSelect(memory); }}
     >
       <planeGeometry args={[tile.w, tile.h]} />
@@ -337,6 +338,7 @@ export interface GlobeSceneProps {
 export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const mouse = useRef<[number, number]>([0, 0]);
   const hoveredIdRef = useRef<string | null>(null);
+  const exitCooldown = useRef<{ id: string; until: number } | null>(null);
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const dragRef = useRef<DragState>({
     active: false, globeId: null, lastX: 0, lastY: 0,
@@ -346,8 +348,19 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const momentumRef = useRef<MomentumStore>({});
 
   const handleHoverChange = useCallback((id: string | null) => {
-    hoveredIdRef.current = id;
-    setHoveredLabel(id);
+    if (id === null) {
+      // Leaving — set cooldown so the returning hitbox can't instantly re-trigger focus
+      if (hoveredIdRef.current) {
+        exitCooldown.current = { id: hoveredIdRef.current, until: Date.now() + 600 };
+      }
+      hoveredIdRef.current = null;
+      setHoveredLabel(null);
+    } else {
+      // Entering — skip if this globe just exited (still in cooldown)
+      if (exitCooldown.current?.id === id && Date.now() < exitCooldown.current.until) return;
+      hoveredIdRef.current = id;
+      setHoveredLabel(id);
+    }
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
