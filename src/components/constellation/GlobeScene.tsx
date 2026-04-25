@@ -398,7 +398,15 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const ensureAudio = useCallback(() => {
     if (!audioCtxRef.current) {
       audioCtxRef.current = createAudioCtx();
-      if (audioCtxRef.current) ambientStopRef.current = startAmbient(audioCtxRef.current);
+      if (audioCtxRef.current) {
+        // Resume on any future click too (browser may suspend after idle)
+        const resume = () => audioCtxRef.current?.state === 'suspended' && audioCtxRef.current.resume();
+        document.addEventListener('click', resume);
+        document.addEventListener('touchstart', resume);
+        audioCtxRef.current.resume().then(() => {
+          if (audioCtxRef.current) ambientStopRef.current = startAmbient(audioCtxRef.current);
+        });
+      }
     } else if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
@@ -442,6 +450,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   }, [ensureAudio]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    ensureAudio(); // initialize AudioContext on first user gesture (browser policy)
     const gid = hoveredIdRef.current;
     if (!gid) {
       isDragging.current = true;
