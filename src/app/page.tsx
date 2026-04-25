@@ -66,8 +66,8 @@ export default function Home() {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            opacity: 0.45,
-            filter: 'grayscale(30%) contrast(1.1)',
+            opacity: 0.38,
+            filter: 'grayscale(20%) contrast(1.05)',
           }}
         >
           <source src="/video/hero.mp4" type="video/mp4" />
@@ -81,7 +81,7 @@ export default function Home() {
         zIndex: 1,
         background: [
           'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)',
-          'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.6) 100%)',
+          'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.65) 100%)',
         ].join(', '),
       }} />
 
