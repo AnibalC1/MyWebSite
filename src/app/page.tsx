@@ -126,17 +126,13 @@ export default function Home() {
           pointerEvents: 'none',
         }}
       >
-        <span style={{
-          fontFamily: '"Cormorant Garamond", serif',
-          fontSize: '1.05rem',
-          letterSpacing: '0.22em',
-          color: '#c9a84c',
-          textTransform: 'uppercase',
-          textShadow: '0 0 20px rgba(201,168,76,0.4)',
-          pointerEvents: 'auto',
-        }}>
-          AC
-        </span>
+        <Link href="/" style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center' }}>
+          <img
+            src="/logo.png"
+            alt="Anibal Cabral"
+            style={{ height: '56px', width: 'auto', filter: 'drop-shadow(0 0 10px rgba(201,168,76,0.6))' }}
+          />
+        </Link>
         <div style={{ display: 'flex', gap: '2.4rem', pointerEvents: 'auto' }}>
           {[
             { label: 'Gallery', href: '/gallery' },
