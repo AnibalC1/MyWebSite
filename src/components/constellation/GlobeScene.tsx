@@ -418,7 +418,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
 
   // Resume AudioContext if browser suspends it (autoplay policy)
   useEffect(() => {
-    const resume = () => { if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume(); };
+    const resume = () => ensureAudio();
     document.addEventListener('click', resume);
     document.addEventListener('touchstart', resume);
     return () => { document.removeEventListener('click', resume); document.removeEventListener('touchstart', resume); };
