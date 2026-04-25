@@ -27,20 +27,26 @@ const PHOTOS = PHOTO_DATA as PhotoEntry[];
 const R = 2.4;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399 rad
 const MAX_SPREAD: Record<string, number> = {
-  worcester:  0.75,
-  nyc_nj:     0.50,
-  manchester: 0.48,
-  cancun:     0.22,
-  houston:    0.18,
-  other:      0.10,
+  worcester:   0.75,
+  'nyc-nj':    0.50,
+  manchester:  0.20,
+  cancun:      0.22,
+  houston:     0.18,
+  boston:      0.18,
+  scranton:    0.15,
+  springfield: 0.12,
+  other:       0.10,
 };
 const CLUSTER_ANCHORS: Record<string, [number, number]> = {
-  worcester:  [42.5,  -71.8],
-  nyc_nj:     [40.7,  -74.0],
-  manchester: [42.9,  -71.5],
-  cancun:     [21.2,  -86.8],
-  houston:    [29.8,  -95.4],
-  other:      [40.0,  -75.0],
+  worcester:   [42.5, -71.8],
+  'nyc-nj':    [40.7, -74.0],
+  manchester:  [42.9, -71.5],
+  cancun:      [21.2, -86.8],
+  houston:     [29.8, -95.4],
+  boston:      [42.4, -71.1],
+  scranton:    [41.4, -75.6],
+  springfield: [42.1, -72.6],
+  other:       [40.0, -75.0],
 };
 
 // ─── Geo helpers ─────────────────────────────────────────────────────────────
