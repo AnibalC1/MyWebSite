@@ -131,20 +131,23 @@ const PhotoTile = memo(function PhotoTile({ tile, texture, memory, globeActiveRe
 
 // ─── Single Globe ─────────────────────────────────────────────────────────────
 
+interface DragState { active: boolean; globeId: string | null; lastX: number; lastY: number; velX: number; velY: number; accDX: number; accDY: number; }
+
 interface GlobeProps {
   def: GlobeDef;
   textures: THREE.Texture[];
   memories: Memory[];
   hoveredIdRef: React.MutableRefObject<string | null>;
+  dragRef: React.MutableRefObject<DragState>;
   onSelect: (m: Memory) => void;
   onHoverChange: (id: string | null) => void;
 }
 
-const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSelect, onHoverChange }: GlobeProps) {
+const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragRef, onSelect, onHoverChange }: GlobeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const t = useRef(Math.random() * 100);
   const activeRef = useRef(false); // shared with PhotoTile for opacity
-  const dragRef = useRef({ active: false, lastX: 0, lastY: 0, velX: 0, velY: 0, accDX: 0, accDY: 0 });
+
   const tiles = useMemo(() => buildLatLongGrid(def.radius), [def.radius]);
   const basePos = useMemo(() => new THREE.Vector3(...def.position), [def.position]);
 
@@ -193,7 +196,7 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
 
     // Rotation: drag > momentum coast > auto-spin
     const drag = dragRef.current;
-    if (isHovered && drag.active) {
+    if (drag.active && drag.globeId === def.id) {
       g.rotation.y += drag.accDX;
       g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + drag.accDY, -1.1, 1.1);
       drag.accDX = 0;
@@ -217,25 +220,7 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
       onPointerOver={(e) => { e.stopPropagation(); onHoverChange(def.id); }}
       onPointerOut={(e)  => { e.stopPropagation(); onHoverChange(null); }}
       onClick={(e) => { e.stopPropagation(); }}
-      onPointerDown={(e) => {
-        if (hoveredIdRef.current !== def.id) return;
-        e.stopPropagation();
-        (e.target as Element).setPointerCapture(e.pointerId);
-        const d = dragRef.current;
-        d.active = true; d.lastX = e.clientX; d.lastY = e.clientY;
-        d.velX = 0; d.velY = 0; d.accDX = 0; d.accDY = 0;
-      }}
-      onPointerMove={(e) => {
-        const d = dragRef.current;
-        if (!d.active) return;
-        const dx = (e.clientX - d.lastX) * 0.013;
-        const dy = (e.clientY - d.lastY) * 0.009;
-        d.lastX = e.clientX; d.lastY = e.clientY;
-        d.accDX += dx; d.accDY += dy;
-        d.velX = dx; d.velY = dy;
-      }}
-      onPointerUp={() => { dragRef.current.active = false; }}
-      onPointerCancel={() => { dragRef.current.active = false; }}
+
     >
       {hasPhotos
         ? tiles.map((tile, i) => (
@@ -263,9 +248,10 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
 // ─── Globe System ─────────────────────────────────────────────────────────────
 
 const GlobeSystem = memo(function GlobeSystem({
-  hoveredIdRef, onSelect, onHoverChange,
+  hoveredIdRef, dragRef, onSelect, onHoverChange,
 }: {
   hoveredIdRef: React.MutableRefObject<string | null>;
+  dragRef: React.MutableRefObject<DragState>;
   onSelect: (m: Memory) => void;
   onHoverChange: (id: string | null) => void;
 }) {
@@ -290,6 +276,7 @@ const GlobeSystem = memo(function GlobeSystem({
           textures={globeTextures[i]}
           memories={globeMemories[i]}
           hoveredIdRef={hoveredIdRef}
+          dragRef={dragRef}
           onSelect={onSelect}
           onHoverChange={onHoverChange}
         />
@@ -323,13 +310,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const mouse = useRef<[number, number]>([0, 0]);
   const hoveredIdRef = useRef<string | null>(null);
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    mouse.current = [
-      (e.clientX / window.innerWidth) * 2 - 1,
-      (e.clientY / window.innerHeight) * 2 - 1,
-    ];
-  }, []);
+  const dragRef = useRef<DragState>({ active: false, globeId: null, lastX: 0, lastY: 0, velX: 0, velY: 0, accDX: 0, accDY: 0 });
 
   // Decouple: ref update (for useFrame) vs state update (for DOM labels)
   const handleHoverChange = useCallback((id: string | null) => {
@@ -337,8 +318,32 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
     setHoveredLabel(id);
   }, []);
 
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const gid = hoveredIdRef.current;
+    if (!gid) return;
+    const d = dragRef.current;
+    d.active = true; d.globeId = gid;
+    d.lastX = e.clientX; d.lastY = e.clientY;
+    d.velX = 0; d.velY = 0; d.accDX = 0; d.accDY = 0;
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    mouse.current = [(e.clientX / window.innerWidth) * 2 - 1, (e.clientY / window.innerHeight) * 2 - 1];
+    const d = dragRef.current;
+    if (!d.active) return;
+    const dx = (e.clientX - d.lastX) * 0.013;
+    const dy = (e.clientY - d.lastY) * 0.009;
+    d.lastX = e.clientX; d.lastY = e.clientY;
+    d.accDX += dx; d.accDY += dy;
+    d.velX = dx; d.velY = dy;
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    dragRef.current.active = false;
+  }, []);
+
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }} onMouseMove={handleMouseMove}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', cursor: dragRef.current.active ? 'grabbing' : 'default' }} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
       <Canvas
         camera={{ position: [0, 0, 7.5], fov: 50, near: 0.1, far: 80 }}
         gl={{ antialias: true, alpha: true }}
@@ -349,6 +354,7 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
         <Suspense fallback={null}>
           <GlobeSystem
             hoveredIdRef={hoveredIdRef}
+            dragRef={dragRef}
             onSelect={onSelect}
             onHoverChange={handleHoverChange}
           />
