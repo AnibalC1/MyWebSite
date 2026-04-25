@@ -148,8 +148,14 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
   const basePos = useMemo(() => new THREE.Vector3(...def.position), [def.position]);
 
   // Set initial position imperatively — never via prop, so React re-renders can't reset it
+  // Orbital params derived from XZ position
+  const orbR    = useMemo(() => Math.sqrt(basePos.x ** 2 + basePos.z ** 2), [basePos]);
+  const orbPhase = useMemo(() => Math.atan2(basePos.z, basePos.x), [basePos]);
+
   useEffect(() => {
-    if (groupRef.current) groupRef.current.position.copy(basePos);
+    if (groupRef.current) {
+      groupRef.current.position.set(basePos.x, basePos.y, basePos.z);
+    }
   }, [basePos]);
 
   useFrame((_, delta) => {
@@ -161,47 +167,62 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, onSel
     const anyHovered = hoveredIdRef.current !== null;
     activeRef.current = isHovered;
 
-    // Scale — hover: 1.35x, others shrink to 0.82x, rest: 1.0
+    // Scale
     const targetScale = isHovered ? 1.35 : (anyHovered ? 0.82 : 1.0);
     g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, targetScale, 0.08));
 
-    // Float — independent per globe, clearly visible
-    const fy = 0.22 * Math.sin(t.current * 0.38 + def.position[0] * 1.3);
-    const fx = 0.11 * Math.cos(t.current * 0.26 + def.position[2] * 0.9);
-    const fz = 0.07 * Math.sin(t.current * 0.31 + def.position[1] * 1.1);
+    // Orbital position — orbit the world center on XZ plane
+    const angle = t.current * def.orbitSpeed + orbPhase;
+    const orbX = Math.cos(angle) * orbR;
+    const orbZ = Math.sin(angle) * orbR;
 
-    // Z — hovered globe comes 2 units forward, others push back
-    const targetZ = basePos.z + (isHovered ? 2.0 : (anyHovered ? -0.7 : 0.0));
+    // Float — independent breathing on Y
+    const fy = 0.20 * Math.sin(t.current * 0.38 + orbPhase * 1.3);
 
-    g.position.x = basePos.x + fx;
-    g.position.y = basePos.y + fy;
-    g.position.z = THREE.MathUtils.lerp(g.position.z, targetZ + fz, 0.06);
+    if (isHovered) {
+      // Hovered: lerp toward orbital pos but push 2.0 forward in Z
+      g.position.x = THREE.MathUtils.lerp(g.position.x, orbX, 0.05);
+      g.position.y = THREE.MathUtils.lerp(g.position.y, basePos.y + fy, 0.05);
+      g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + 2.0, 0.06);
+    } else {
+      g.position.x = orbX;
+      g.position.y = basePos.y + fy;
+      g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + (anyHovered ? -0.6 : 0), 0.05);
+    }
 
-    // Slow spin
+    // Slow spin on own axis
     g.rotation.y += delta * 0.055;
     g.rotation.x += delta * 0.018;
   });
 
-  if (!memories.length || !textures.length) return null;
+  const hasPhotos = memories.length > 0 && textures.length > 0;
 
   return (
-    // NO position prop — position managed entirely in useFrame/useEffect
     <group
       ref={groupRef}
       onPointerOver={(e) => { e.stopPropagation(); onHoverChange(def.id); }}
       onPointerOut={(e)  => { e.stopPropagation(); onHoverChange(null); }}
       onClick={(e) => { e.stopPropagation(); }}
     >
-      {tiles.map((tile, i) => (
-        <PhotoTile
-          key={i}
-          tile={tile}
-          texture={textures[i % textures.length]}
-          memory={memories[i % memories.length]}
-          globeActiveRef={activeRef}
-          onSelect={onSelect}
-        />
-      ))}
+      {hasPhotos
+        ? tiles.map((tile, i) => (
+            <PhotoTile
+              key={i}
+              tile={tile}
+              texture={textures[i % textures.length]}
+              memory={memories[i % memories.length]}
+              globeActiveRef={activeRef}
+              onSelect={onSelect}
+            />
+          ))
+        : (
+            // Empty globe — subtle glow sphere (no photos yet)
+            <mesh>
+              <sphereGeometry args={[def.radius, 32, 32]} />
+              <meshBasicMaterial color={def.color} transparent opacity={0.18} wireframe />
+            </mesh>
+          )
+      }
     </group>
   );
 });
