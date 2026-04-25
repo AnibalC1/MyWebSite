@@ -9,53 +9,26 @@ import { BlendFunction, KernelSize } from 'postprocessing';
 import { GLOBE_DEFS, GLOBE_CONNECTIONS, type GlobeDef } from '@/data/globes';
 import { MEMORIES, type Memory } from '@/data/memories';
 
-// ─── Holographic Globe Shader ──────────────────────────────────────────────────
+// ─── Fibonacci Sphere Distribution ───────────────────────────────────────────
 
-const holoVert = `
-  varying vec3 vNormal;
-  varying vec3 vViewDir;
-  varying vec2 vUv;
-  void main() {
-    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-    vNormal = normalize(normalMatrix * normal);
-    vViewDir = normalize(-mvPos.xyz);
-    vUv = uv;
-    gl_Position = projectionMatrix * mvPos;
-  }
-`;
+function fibonacciSphere(n: number, radius: number): THREE.Vector3[] {
+  if (n === 0) return [];
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  return Array.from({ length: n }, (_, i) => {
+    const y = n === 1 ? 0 : 1 - (i / (n - 1)) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const theta = goldenAngle * i;
+    return new THREE.Vector3(
+      Math.cos(theta) * r * radius,
+      y * radius,
+      Math.sin(theta) * r * radius,
+    );
+  });
+}
 
-const holoFrag = `
-  uniform vec3 uColor;
-  uniform float uTime;
-  uniform float uOpacity;
-  varying vec3 vNormal;
-  varying vec3 vViewDir;
-  varying vec2 vUv;
+// ─── Holographic Rim Shader ───────────────────────────────────────────────────
 
-  vec3 hsl2rgb(vec3 c) {
-    vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
-    return c.z + c.y * (rgb - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
-  }
-
-  void main() {
-    float ndotv = max(dot(vNormal, vViewDir), 0.0);
-    float fresnel = pow(1.0 - ndotv, 2.8);
-    float scan = sin(vUv.y * 90.0 - uTime * 0.8) * 0.05 + 0.95;
-    vec2 grid = abs(fract(vUv * 14.0) - 0.5);
-    float gridLine = min(grid.x, grid.y);
-    float gridMask = 1.0 - smoothstep(0.0, 0.045, gridLine);
-    float hue = mod(ndotv * 0.45 + uTime * 0.04, 1.0);
-    vec3 iriColor = hsl2rgb(vec3(hue, 0.55, 0.65));
-    float pulse = 1.0 + 0.1 * sin(uTime * 1.6);
-    vec3 baseColor = mix(uColor, iriColor, fresnel * 0.35);
-    baseColor += gridMask * iriColor * 0.12;
-    baseColor *= scan * pulse;
-    float alpha = (fresnel * uOpacity + gridMask * 0.07) * uOpacity;
-    gl_FragColor = vec4(baseColor, clamp(alpha, 0.0, 1.0));
-  }
-`;
-
-const coreVert = `
+const rimVert = `
   varying vec3 vNormal;
   varying vec3 vViewDir;
   void main() {
@@ -66,7 +39,7 @@ const coreVert = `
   }
 `;
 
-const coreFrag = `
+const rimFrag = `
   uniform vec3 uColor;
   uniform float uOpacity;
   uniform float uTime;
@@ -74,9 +47,9 @@ const coreFrag = `
   varying vec3 vViewDir;
   void main() {
     float ndotv = max(dot(vNormal, vViewDir), 0.0);
-    float fill = pow(ndotv, 3.5) * 0.18;
-    float breathe = 1.0 + 0.08 * sin(uTime * 0.9);
-    gl_FragColor = vec4(uColor * breathe, fill * uOpacity);
+    float fresnel = pow(1.0 - ndotv, 3.2);
+    float pulse = 1.0 + 0.12 * sin(uTime * 1.5);
+    gl_FragColor = vec4(uColor, fresnel * uOpacity * pulse);
   }
 `;
 
@@ -88,10 +61,8 @@ function CameraRig({ mouse }: { mouse: React.MutableRefObject<[number, number]> 
   useFrame((_, delta) => {
     t.current += delta;
     const [mx, my] = mouse.current;
-    const tx = mx * 0.55;
-    const ty = -my * 0.38 + 0.12 * Math.sin(t.current * 0.27);
-    camera.position.x += (tx - camera.position.x) * 0.035;
-    camera.position.y += (ty - camera.position.y) * 0.035;
+    camera.position.x += (mx * 0.55 - camera.position.x) * 0.035;
+    camera.position.y += (-my * 0.38 + 0.1 * Math.sin(t.current * 0.27) - camera.position.y) * 0.035;
     camera.position.z += (7.5 - camera.position.z) * 0.025;
     camera.lookAt(0, 0, 0);
   });
@@ -137,7 +108,7 @@ function GlobeConnections({ activeId }: { activeId: React.MutableRefObject<strin
       const pts: THREE.Vector3[] = [];
       for (let i = 0; i <= 32; i++) pts.push(curve.getPoint(i / 32));
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color: '#c9a84c', transparent: true, opacity: 0.1 });
+      const mat = new THREE.LineBasicMaterial({ color: '#c9a84c', transparent: true, opacity: 0.08 });
       return { line: new THREE.Line(geo, mat), aId, bId };
     }),
   []);
@@ -147,7 +118,7 @@ function GlobeConnections({ activeId }: { activeId: React.MutableRefObject<strin
     lineObjects.forEach(({ line, aId, bId }) => {
       const mat = line.material as THREE.LineBasicMaterial;
       const connected = active && (aId === active || bId === active);
-      const target = connected ? 0.6 : (active ? 0.03 : 0.1);
+      const target = connected ? 0.55 : (active ? 0.02 : 0.08);
       mat.opacity += (target - mat.opacity) * 0.06;
     });
   });
@@ -161,54 +132,57 @@ function GlobeConnections({ activeId }: { activeId: React.MutableRefObject<strin
   );
 }
 
-// ─── Memory Fragment ──────────────────────────────────────────────────────────
+// ─── Surface Photo Fragment ───────────────────────────────────────────────────
+// Each fragment sits ON the sphere surface, normal facing outward.
+// The collection of fragments defines the globe shape.
 
-function MemoryFragmentProxy({
-  texture, memory, orbitRadius, orbitOffset, orbitSpeed,
-  globePos, activeIdRef, globeId, onSelect,
+function SurfaceFragment({
+  localPos, quat, texture, memory,
+  planeW, planeH,
+  globeId, activeIdRef, onSelect,
 }: {
+  localPos: THREE.Vector3;
+  quat: THREE.Quaternion;
   texture: THREE.Texture;
   memory: Memory;
-  orbitRadius: number;
-  orbitOffset: number;
-  orbitSpeed: number;
-  globePos: [number, number, number];
-  activeIdRef: React.MutableRefObject<string | null>;
+  planeW: number;
+  planeH: number;
   globeId: string;
+  activeIdRef: React.MutableRefObject<string | null>;
   onSelect: (m: Memory) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const t = useRef(orbitOffset);
   const [hov, setHov] = useState(false);
-  const axis = useMemo(() =>
-    new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(),
-  []);
 
   useFrame((_, delta) => {
     const mesh = meshRef.current;
     if (!mesh) return;
     const isActive = activeIdRef.current === globeId;
-    t.current += delta * orbitSpeed * (isActive ? 0.55 : 0.22);
-    const q = new THREE.Quaternion().setFromAxisAngle(axis, t.current);
-    const bp = new THREE.Vector3(orbitRadius, 0, 0).applyQuaternion(q);
-    mesh.position.set(globePos[0] + bp.x, globePos[1] + bp.y, globePos[2] + bp.z);
-    mesh.lookAt(globePos[0], globePos[1], globePos[2]);
     const mat = mesh.material as THREE.MeshBasicMaterial;
-    const targetOpacity = isActive ? (hov ? 0.88 : 0.46) : 0.055;
+    const targetOpacity = isActive ? (hov ? 0.92 : 0.68) : 0.14;
     mat.opacity += (targetOpacity - mat.opacity) * 0.07;
-    const targetScale = isActive ? (hov ? 1.3 : 1.0) : 0.65;
+    const targetScale = isActive ? (hov ? 1.18 : 1.0) : 0.88;
     mesh.scale.setScalar(mesh.scale.x + (targetScale - mesh.scale.x) * 0.09);
   });
 
   return (
     <mesh
       ref={meshRef}
+      position={localPos}
+      quaternion={quat}
       onPointerOver={(e) => { e.stopPropagation(); setHov(true); }}
       onPointerOut={() => setHov(false)}
       onClick={(e) => { e.stopPropagation(); if (activeIdRef.current === globeId) onSelect(memory); }}
     >
-      <planeGeometry args={[0.42, 0.28]} />
-      <meshBasicMaterial map={texture} transparent opacity={0.055} side={THREE.DoubleSide} toneMapped={false} />
+      <planeGeometry args={[planeW, planeH]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        opacity={0.14}
+        side={THREE.DoubleSide}
+        toneMapped={false}
+        depthWrite={false}
+      />
     </mesh>
   );
 }
@@ -228,55 +202,73 @@ function Globe({
   const groupRef = useRef<THREE.Group>(null);
   const t = useRef(Math.random() * 100);
 
-  const holoMat = useMemo(() => new THREE.ShaderMaterial({
+  // Number of surface fragments — more = denser sphere
+  const fragCount = memories.length > 0 ? Math.max(memories.length * 5, 18) : 0;
+
+  // Fibonacci sphere positions (local space, relative to globe center)
+  const surfacePoints = useMemo(
+    () => fibonacciSphere(fragCount, def.radius),
+    [fragCount, def.radius]
+  );
+
+  // Quaternions: rotate each plane so +Z aligns with outward sphere normal
+  const quats = useMemo(
+    () => surfacePoints.map(p =>
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        p.clone().normalize()
+      )
+    ),
+    [surfacePoints]
+  );
+
+  // Photo plane size — sized to nearly tile the sphere surface
+  const planeW = def.radius * 0.56;
+  const planeH = def.radius * 0.38;
+
+  // Rim material (holographic edge glow)
+  const rimMat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uColor: { value: new THREE.Color(def.color) },
+      uOpacity: { value: 0.75 },
       uTime: { value: 0 },
-      uOpacity: { value: 0.9 },
     },
-    vertexShader: holoVert,
-    fragmentShader: holoFrag,
+    vertexShader: rimVert,
+    fragmentShader: rimFrag,
     transparent: true,
     depthWrite: false,
     side: THREE.FrontSide,
   }), [def.color]);
 
-  const coreMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uColor: { value: new THREE.Color(def.color) },
-      uOpacity: { value: 1.0 },
-      uTime: { value: 0 },
-    },
-    vertexShader: coreVert,
-    fragmentShader: coreFrag,
-    transparent: true,
-    depthWrite: false,
-  }), [def.color]);
-
   useFrame((_, delta) => {
     t.current += delta;
-    holoMat.uniforms.uTime.value = t.current;
-    coreMat.uniforms.uTime.value = t.current;
+    rimMat.uniforms.uTime.value = t.current;
 
     const isActive = activeIdRef.current === def.id;
     const isOther = activeIdRef.current !== null && !isActive;
 
     if (groupRef.current) {
       const g = groupRef.current;
-      const targetScale = isActive ? 1.3 : (isOther ? 0.78 : 1.0);
+      const targetScale = isActive ? 1.28 : (isOther ? 0.76 : 1.0);
       g.scale.setScalar(g.scale.x + (targetScale - g.scale.x) * 0.055);
-      const floatY = 0.075 * Math.sin(t.current * 0.38 + def.position[0] * 1.2);
-      const floatX = 0.03 * Math.cos(t.current * 0.22 + def.position[2]);
-      const targetZ = isActive ? def.position[2] + 1.8 : (isOther ? def.position[2] - 0.7 : def.position[2]);
+
+      // Organic float
+      const floatY = 0.07 * Math.sin(t.current * 0.38 + def.position[0] * 1.2);
+      const floatX = 0.028 * Math.cos(t.current * 0.22 + def.position[2]);
+      const targetZ = isActive ? def.position[2] + 1.9 : (isOther ? def.position[2] - 0.65 : def.position[2]);
+
       g.position.x += (def.position[0] + floatX - g.position.x) * 0.04;
       g.position.y += (def.position[1] + floatY - g.position.y) * 0.04;
       g.position.z += (targetZ - g.position.z) * 0.04;
-      g.rotation.y += delta * 0.07;
-      g.rotation.x += delta * 0.025;
+
+      // Slow rotation — fragments orbit as a unit
+      g.rotation.y += delta * 0.065;
+      g.rotation.x += delta * 0.022;
     }
 
-    const targetOpacity = isOther ? 0.28 : 0.9;
-    holoMat.uniforms.uOpacity.value += (targetOpacity - holoMat.uniforms.uOpacity.value) * 0.055;
+    // Rim opacity — fade when another globe is active
+    const targetRimOpacity = isOther ? 0.22 : 0.75;
+    rimMat.uniforms.uOpacity.value += (targetRimOpacity - rimMat.uniforms.uOpacity.value) * 0.055;
   });
 
   return (
@@ -290,59 +282,58 @@ function Globe({
         activeIdRef.current = activeIdRef.current === def.id ? null : def.id;
       }}
     >
-      {/* Core fill */}
+      {/* Ambient glow core — implies presence even when fragments are sparse */}
       <mesh>
-        <sphereGeometry args={[def.radius * 0.95, 64, 64]} />
-        <primitive object={coreMat} attach="material" />
+        <sphereGeometry args={[def.radius * 0.38, 16, 16]} />
+        <meshBasicMaterial color={def.color} transparent opacity={0.11} depthWrite={false} toneMapped={false} />
       </mesh>
 
-      {/* Holographic rim */}
+      {/* Point light — gives depth to fragments */}
+      <pointLight color={def.color} intensity={0.28} distance={def.radius * 4} decay={2} />
+
+      {/* Surface photo fragments — THESE ARE THE GLOBE */}
+      {surfacePoints.map((pos, i) => {
+        const mem = memories[i % memories.length];
+        const tex = textures[i % textures.length];
+        return tex ? (
+          <SurfaceFragment
+            key={i}
+            localPos={pos}
+            quat={quats[i]}
+            texture={tex}
+            memory={mem}
+            planeW={planeW}
+            planeH={planeH}
+            globeId={def.id}
+            activeIdRef={activeIdRef}
+            onSelect={onSelect}
+          />
+        ) : null;
+      })}
+
+      {/* Holographic rim — subtle edge glow only, sphere shape implied */}
       <mesh>
-        <sphereGeometry args={[def.radius, 64, 64]} />
-        <primitive object={holoMat} attach="material" />
+        <sphereGeometry args={[def.radius * 1.04, 48, 48]} />
+        <primitive object={rimMat} attach="material" />
       </mesh>
 
-      {/* Outer halo */}
+      {/* Outer halo — soft bloom catch */}
       <mesh>
-        <sphereGeometry args={[def.radius * 1.28, 32, 32]} />
+        <sphereGeometry args={[def.radius * 1.32, 24, 24]} />
         <meshBasicMaterial
           color={def.color}
           transparent
-          opacity={0.04}
+          opacity={0.028}
           side={THREE.BackSide}
           depthWrite={false}
           toneMapped={false}
         />
       </mesh>
-
-      {/* God ray emissive core */}
-      <mesh>
-        <sphereGeometry args={[def.radius * 0.55, 16, 16]} />
-        <meshBasicMaterial color={def.color} transparent opacity={0.08} depthWrite={false} toneMapped={false} />
-      </mesh>
-
-      {/* Memory fragments */}
-      {memories.map((mem, i) =>
-        textures[i] ? (
-          <MemoryFragmentProxy
-            key={mem.id}
-            texture={textures[i]}
-            memory={mem}
-            orbitRadius={def.radius * (0.82 + (i % 3) * 0.2)}
-            orbitOffset={(i / Math.max(memories.length, 1)) * Math.PI * 2}
-            orbitSpeed={0.16 + i * 0.038}
-            globePos={def.position}
-            activeIdRef={activeIdRef}
-            globeId={def.id}
-            onSelect={onSelect}
-          />
-        ) : null
-      )}
     </group>
   );
 }
 
-// ─── Globe System ─────────────────────────────────────────────────────────────
+// ─── Globe System (loads all textures) ───────────────────────────────────────
 
 function GlobeSystem({
   activeIdRef, onSelect, onHover,
@@ -357,8 +348,10 @@ function GlobeSystem({
   const allPaths = useMemo(() =>
     globeMemories.flatMap(mems => mems.map(m => m.img)), [globeMemories]
   );
-  const safeAllPaths = allPaths.length > 0 ? allPaths : ['/images/photo-oq31-family-selfie.jpg'];
-  const allTextures = useTexture(safeAllPaths) as THREE.Texture[];
+  // Always pass at least one path to useTexture
+  const safePaths = allPaths.length > 0 ? allPaths : ['/images/photo-oq31-family-selfie.jpg'];
+  const allTextures = useTexture(safePaths) as THREE.Texture[];
+
   let idx = 0;
   const globeTextures = globeMemories.map(mems => mems.map(() => allTextures[idx++]));
 
@@ -403,7 +396,12 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
     <div style={{ width: '100%', height: '100%', position: 'relative' }} onMouseMove={handleMouseMove}>
       <Canvas
         camera={{ position: [0, 0, 7.5], fov: 50, near: 0.1, far: 80 }}
-        gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.15 }}
+        gl={{
+          antialias: true,
+          alpha: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.15,
+        }}
         style={{ background: 'transparent' }}
         dpr={[1, 2]}
       >
@@ -417,9 +415,9 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
         </Suspense>
         <EffectComposer multisampling={0}>
           <Bloom
-            intensity={1.1}
-            luminanceThreshold={0.18}
-            luminanceSmoothing={0.82}
+            intensity={1.2}
+            luminanceThreshold={0.15}
+            luminanceSmoothing={0.85}
             mipmapBlur
             kernelSize={KernelSize.LARGE}
           />
@@ -434,31 +432,28 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
       </Canvas>
 
       {/* DOM label overlay */}
-      {GLOBE_DEFS.map(def => {
-        const active = hoveredId === def.id;
-        return (
-          <div
-            key={def.id}
-            style={{
-              position: 'absolute',
-              pointerEvents: 'none',
-              transition: 'opacity 0.5s ease, transform 0.5s ease',
-              opacity: active ? 0.95 : 0.32,
-              transform: `translate(-50%, -50%) ${active ? 'scale(1.08)' : 'scale(1)'}`,
-              color: def.color,
-              fontFamily: '"Cormorant Garamond", serif',
-              fontSize: '0.72rem',
-              letterSpacing: '0.28em',
-              textTransform: 'uppercase' as const,
-              textShadow: `0 0 14px ${def.color}99, 0 0 28px ${def.color}44`,
-              left: `${50 + def.position[0] * 9.2}%`,
-              top: `${50 - def.position[1] * 9.8}%`,
-            }}
-          >
-            {def.label}
-          </div>
-        );
-      })}
+      {GLOBE_DEFS.map(def => (
+        <div
+          key={def.id}
+          style={{
+            position: 'absolute',
+            pointerEvents: 'none',
+            transition: 'opacity 0.5s ease, transform 0.5s ease',
+            opacity: hoveredId === def.id ? 0.95 : 0.28,
+            transform: `translate(-50%, -50%) ${hoveredId === def.id ? 'scale(1.1)' : 'scale(1)'}`,
+            color: def.color,
+            fontFamily: '"Cormorant Garamond", serif',
+            fontSize: '0.7rem',
+            letterSpacing: '0.3em',
+            textTransform: 'uppercase' as const,
+            textShadow: `0 0 16px ${def.color}aa, 0 0 32px ${def.color}44`,
+            left: `${50 + def.position[0] * 9.2}%`,
+            top: `${50 - def.position[1] * 9.8}%`,
+          }}
+        >
+          {def.label}
+        </div>
+      ))}
     </div>
   );
 }
