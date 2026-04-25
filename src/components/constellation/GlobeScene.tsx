@@ -243,7 +243,7 @@ const Globe = memo(function Globe({
       {/* ── Invisible sphere hitbox — solid so it blocks raycasts through tile gaps ── */}
       <mesh
         onPointerEnter={(e) => { e.stopPropagation(); if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; } onHoverChange(def.id); }}
-        onPointerLeave={(e) => { e.stopPropagation(); leaveTimer.current = setTimeout(() => { leaveTimer.current = null; onHoverChange(null); }, 50); }}
+        onPointerLeave={(e) => { e.stopPropagation(); leaveTimer.current = setTimeout(() => { leaveTimer.current = null; if (hoveredIdRef.current === def.id) onHoverChange(null); }, 80); }}
       >
         <sphereGeometry args={[def.radius * 1.05, 24, 24]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
