@@ -171,8 +171,8 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
     const anyHovered = hoveredIdRef.current !== null;
     activeRef.current = isHovered;
 
-    // Scale — hovered globe gets bigger, others shrink into background
-    const targetScale = isHovered ? 1.5 : (anyHovered ? 0.72 : 1.0);
+    // Scale — normalize so ALL hovered globes hit the same visual size (radius 1.6 world units)
+    const targetScale = isHovered ? (1.6 / def.radius) : (anyHovered ? 0.72 : 1.0);
     g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, targetScale, 0.08));
 
     // Orbital position — orbit the world center on XZ plane
@@ -202,7 +202,7 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
       g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + drag.accDY, -1.1, 1.1);
       drag.accDX = 0;
       drag.accDY = 0;
-    } else if (Math.abs(drag.velX) + Math.abs(drag.velY) > 0.0003) {
+    } else if (drag.globeId === def.id && Math.abs(drag.velX) + Math.abs(drag.velY) > 0.0003) {
       g.rotation.y += drag.velX;
       g.rotation.x = THREE.MathUtils.clamp(g.rotation.x + drag.velY, -1.1, 1.1);
       drag.velX *= 0.92;
@@ -218,7 +218,7 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
   return (
     <group
       ref={groupRef}
-      onPointerOver={(e) => { e.stopPropagation(); onHoverChange(def.id); }}
+      onPointerOver={(e) => { e.stopPropagation(); if (hoveredIdRef.current !== null && hoveredIdRef.current !== def.id) return; onHoverChange(def.id); }}
       onPointerOut={(e)  => { e.stopPropagation(); onHoverChange(null); }}
       onClick={(e) => { e.stopPropagation(); }}
 
