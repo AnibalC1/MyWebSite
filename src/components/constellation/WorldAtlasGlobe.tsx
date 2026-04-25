@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Stars } from '@react-three/drei';
+import { Stars, OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { mesh as topoMesh } from 'topojson-client';
@@ -531,6 +531,15 @@ export default function WorldAtlasGlobe() {
         />
 
         <CameraRig />
+        <OrbitControls
+          enablePan={false}
+          enableZoom={true}
+          zoomSpeed={0.5}
+          minDistance={4}
+          maxDistance={12}
+          rotateSpeed={0.5}
+          autoRotate={false}
+        />
 
         <EffectComposer>
           <Bloom
