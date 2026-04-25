@@ -307,7 +307,7 @@ export default function VideoTheater({ clips }: Props) {
       style={{
         position: 'fixed', inset: 0,
         background: '#000',
-        overflow: 'hidden',
+        overflow: 'visible',
         fontFamily: "'Courier New', monospace",
         cursor: 'default',
       }}
@@ -377,6 +377,91 @@ export default function VideoTheater({ clips }: Props) {
       </motion.nav>
 
       {/* ── THE SCREEN ───────────────────────────────────── */}
+
+      {/* ── Side Hologram Clips ──────────────────────────── */}
+      {/* PREV */}
+      <div
+        onClick={() => go(-1)}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: '48%',
+          transform: 'translate(-12%, -50%) scale(0.55) rotateY(10deg)',
+          transformOrigin: 'right center',
+          width: 'min(88vw, 1400px)',
+          aspectRatio: '16 / 9',
+          zIndex: 8,
+          cursor: 'pointer',
+          filter: 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)',
+          opacity: 0.6,
+          transition: 'opacity 0.25s, filter 0.25s',
+          boxShadow: '0 0 40px 8px rgba(0,200,255,0.25)',
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLDivElement).style.opacity = '0.85';
+          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.9) saturate(0.2) hue-rotate(185deg) contrast(1.3)';
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLDivElement).style.opacity = '0.6';
+          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)';
+        }}
+      >
+        <video
+          autoPlay muted loop playsInline
+          src={clips[(current - 1 + clips.length) % clips.length].src}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,210,255,0.07) 3px, rgba(0,210,255,0.08) 4px)',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'rgba(0,190,255,0.06)',
+        }} />
+      </div>
+      {/* NEXT */}
+      <div
+        onClick={() => go(1)}
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: '48%',
+          transform: 'translate(12%, -50%) scale(0.55) rotateY(-10deg)',
+          transformOrigin: 'left center',
+          width: 'min(88vw, 1400px)',
+          aspectRatio: '16 / 9',
+          zIndex: 8,
+          cursor: 'pointer',
+          filter: 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)',
+          opacity: 0.6,
+          transition: 'opacity 0.25s, filter 0.25s',
+          boxShadow: '0 0 40px 8px rgba(0,200,255,0.25)',
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLDivElement).style.opacity = '0.85';
+          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.9) saturate(0.2) hue-rotate(185deg) contrast(1.3)';
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLDivElement).style.opacity = '0.6';
+          (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.6) saturate(0.1) hue-rotate(185deg) contrast(1.3)';
+        }}
+      >
+        <video
+          autoPlay muted loop playsInline
+          src={clips[(current + 1) % clips.length].src}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,210,255,0.07) 3px, rgba(0,210,255,0.08) 4px)',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'rgba(0,190,255,0.06)',
+        }} />
+      </div>
+
       <div style={{
         position: 'absolute',
         /* Slightly above center — you look up at it */
