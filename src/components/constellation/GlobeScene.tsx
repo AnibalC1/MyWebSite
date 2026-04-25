@@ -171,8 +171,8 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
     const anyHovered = hoveredIdRef.current !== null;
     activeRef.current = isHovered;
 
-    // Scale
-    const targetScale = isHovered ? 1.35 : (anyHovered ? 0.82 : 1.0);
+    // Scale — hovered globe gets bigger, others shrink into background
+    const targetScale = isHovered ? 1.5 : (anyHovered ? 0.72 : 1.0);
     g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, targetScale, 0.08));
 
     // Orbital position — orbit the world center on XZ plane
@@ -184,14 +184,15 @@ const Globe = memo(function Globe({ def, textures, memories, hoveredIdRef, dragR
     const fy = 0.20 * Math.sin(t.current * 0.38 + orbPhase * 1.3);
 
     if (isHovered) {
-      // Hovered: lerp toward orbital pos but push 2.0 forward in Z
-      g.position.x = THREE.MathUtils.lerp(g.position.x, orbX, 0.05);
-      g.position.y = THREE.MathUtils.lerp(g.position.y, basePos.y + fy, 0.05);
-      g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + 2.0, 0.06);
+      // Hovered: snap to screen center, stop orbiting and floating
+      g.position.x = THREE.MathUtils.lerp(g.position.x, 0, 0.07);
+      g.position.y = THREE.MathUtils.lerp(g.position.y, 0, 0.07);
+      g.position.z = THREE.MathUtils.lerp(g.position.z, 3.2, 0.07);
     } else {
+      // Others keep orbiting normally, pushed slightly back when something is focused
       g.position.x = orbX;
       g.position.y = basePos.y + fy;
-      g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + (anyHovered ? -0.6 : 0), 0.05);
+      g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + (anyHovered ? -1.2 : 0), 0.05);
     }
 
     // Rotation: drag > momentum coast > auto-spin
