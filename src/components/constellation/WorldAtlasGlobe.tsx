@@ -321,6 +321,60 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   );
 }
 
+// ─── Hover overlay (centered, pointer-events:none, disappears on mouse-out) ───
+function HoverOverlay({hoveredIdx,selectedIdx}:{hoveredIdx:number;selectedIdx:number}){
+  const cardRef=useRef<HTMLDivElement>(null);
+  const prevIdx=useRef(-1);
+  // Show only when hovering and nothing is selected (selected overlay takes priority)
+  const photo=hoveredIdx>=0&&selectedIdx<0?PHOTOS[hoveredIdx]:null;
+
+  useEffect(()=>{
+    const card=cardRef.current;
+    if(!card)return;
+    if(!photo){
+      card.style.transition='opacity 0.18s ease,transform 0.18s ease';
+      card.style.opacity='0';
+      card.style.transform='translate(-50%,-50%) scale(0.94)';
+      prevIdx.current=-1;
+      return;
+    }
+    if(hoveredIdx===prevIdx.current)return;
+    prevIdx.current=hoveredIdx;
+    // Random cinematic spin entry — different direction each hover
+    const ry=(Math.random()>0.5?1:-1)*(42+Math.random()*46);
+    const rx=(Math.random()-0.5)*26;
+    const rz=(Math.random()-0.5)*14;
+    const ease='cubic-bezier(0.22,1,0.36,1)';
+    card.style.transition='none';
+    card.style.opacity='0';
+    card.style.transform=`translate(-50%,-50%) perspective(1200px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(0.15)`;
+    void card.getBoundingClientRect();
+    card.style.transition=`opacity 0.22s ease,transform 0.52s ${ease}`;
+    card.style.opacity='1';
+    card.style.transform='translate(-50%,-50%) perspective(1200px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1)';
+  },[hoveredIdx,photo]);
+
+  return(
+    <div ref={cardRef} style={{
+      position:'fixed',top:'50%',left:'50%',zIndex:80,
+      opacity:0,transform:'translate(-50%,-50%) scale(0.94)',
+      maxWidth:'min(55vw,620px)',pointerEvents:'none',
+      display:'flex',flexDirection:'column',alignItems:'center',
+    }}>
+      <div style={{border:'1px solid rgba(255,255,255,0.13)',borderRadius:'3px',overflow:'hidden',background:'#000',maxHeight:'62vh',boxShadow:'0 12px 60px rgba(0,0,0,0.65)'}}>
+        {photo&&<img src={photo.src} alt="" style={{display:'block',maxWidth:'100%',maxHeight:'62vh',objectFit:'contain'}}/>}
+      </div>
+      {photo&&(
+        <div style={{marginTop:'0.6rem',textAlign:'center'}}>
+          <p style={{fontFamily:'"Cormorant Garamond",serif',fontSize:'1.05rem',fontStyle:'italic',color:'rgba(255,255,255,0.82)',margin:0,letterSpacing:'0.04em'}}>{photo.label}</p>
+          {photo.people.length>0&&<p style={{fontFamily:'Inter,sans-serif',fontSize:'0.58rem',letterSpacing:'0.14em',color:'rgba(201,168,76,0.65)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.people.filter(p=>p!=='Anibal Cabral').slice(0,3).join(' · ')}</p>}
+          <p style={{fontFamily:'Inter,sans-serif',fontSize:'0.52rem',letterSpacing:'0.18em',color:'rgba(255,255,255,0.2)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.date.slice(0,12)} · Click for connections</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Photo overlay (click only) ───────────────────────────────────────────────
 function PhotoOverlay({selectedIdx,onClose}:{selectedIdx:number;onClose:()=>void;}){
   const cardRef=useRef<HTMLDivElement>(null);
@@ -381,6 +435,7 @@ function PhotoOverlay({selectedIdx,onClose}:{selectedIdx:number;onClose:()=>void
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function WorldAtlasGlobe(){
   const[ready,setReady]=useState(false);
+  const[hoveredIdx,setHoveredIdx]=useState(-1);
   const[selectedIdx,setSelectedIdx]=useState(-1);
 
   // Shared refs — written by Three.js, read by DOM
@@ -393,6 +448,7 @@ export default function WorldAtlasGlobe(){
 
   const handleHoverChange=useCallback((i:number)=>{
     pausedRef.current=i>=0||globalSelRef.current>=0;
+    setHoveredIdx(i);
   },[]);
 
   const handleSelect=useCallback((i:number)=>{
@@ -403,6 +459,7 @@ export default function WorldAtlasGlobe(){
   },[]);
 
   const handleClose=useCallback(()=>{
+    setHoveredIdx(-1);
     setSelectedIdx(-1);
     globalSelRef.current=-1;
     globalHovRef.current=-1;
@@ -441,6 +498,9 @@ export default function WorldAtlasGlobe(){
           <Vignette darkness={0.55} offset={0.3}/>
         </EffectComposer>
       </Canvas>
+
+      {/* Hover overlay — centered, pointer-events:none, spin-in animation */}
+      <HoverOverlay hoveredIdx={hoveredIdx} selectedIdx={selectedIdx}/>
 
       {/* Click overlay — DOM */}
       <PhotoOverlay selectedIdx={selectedIdx} onClose={handleClose}/>
