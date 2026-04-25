@@ -1,23 +1,40 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
-import type { Memory } from '@/data/memories';
 
-const GlobeScene = dynamic(
-  () => import('@/components/constellation/GlobeScene').then(m => ({ default: m.GlobeScene })),
-  { ssr: false }
-);
+const FIRST = 'ANIBAL';
+const LAST  = 'CABRAL';
+
+function SplitWord({ word, delay }: { word: string; delay: number }) {
+  return (
+    <span style={{ display: 'inline-block', overflow: 'hidden', lineHeight: 1 }}>
+      {word.split('').map((ch, i) => (
+        <motion.span
+          key={i}
+          style={{ display: 'inline-block', willChange: 'transform' }}
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: '0%', opacity: 1 }}
+          transition={{
+            delay: delay + i * 0.055,
+            duration: 0.9,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          {ch}
+        </motion.span>
+      ))}
+    </span>
+  );
+}
 
 export default function Home() {
-  const [selected, setSelected] = useState<Memory | null>(null);
   const [ready, setReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Fade-in on mount
   useEffect(() => {
-    const t = setTimeout(() => setReady(true), 120);
+    const t = setTimeout(() => setReady(true), 80);
     return () => clearTimeout(t);
   }, []);
 
@@ -26,31 +43,71 @@ export default function Home() {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'radial-gradient(ellipse at 50% 60%, #0a0806 0%, #000000 100%)',
+        background: '#000',
         overflow: 'hidden',
         opacity: ready ? 1 : 0,
-        transition: 'opacity 1.2s ease',
+        transition: 'opacity 0.8s ease',
       }}
     >
-      {/* Film grain */}
-      <div className="grain-overlay" aria-hidden />
+      {/* ── Video background ── */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3, duration: 2.5, ease: 'easeInOut' }}
+        style={{ position: 'absolute', inset: 0, zIndex: 0 }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 0.18,
+            filter: 'grayscale(30%) contrast(1.1)',
+          }}
+        >
+          <source src="/video/hero.mp4" type="video/mp4" />
+        </video>
+      </motion.div>
 
-      {/* 3D scene — full bleed */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
-        <GlobeScene onSelect={setSelected} />
-      </div>
+      {/* ── Multi-layer dark overlay ── */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 1,
+        background: [
+          'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.82) 100%)',
+          'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.85) 100%)',
+        ].join(', '),
+      }} />
 
-      {/* Ghost nav */}
+      {/* ── Grain ── */}
+      <div className="grain-overlay" aria-hidden style={{ zIndex: 2 }} />
+
+      {/* ── Scanlines (futuristic) ── */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 3,
+        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 4px)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── Nav ── */}
       <motion.nav
-        initial={{ opacity: 0, y: -8 }}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 2.2, duration: 1.0, ease: 'easeOut' }}
+        transition={{ delay: 2.6, duration: 1.0, ease: 'easeOut' }}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          zIndex: 10,
+          zIndex: 20,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -64,15 +121,16 @@ export default function Home() {
           letterSpacing: '0.22em',
           color: '#c9a84c',
           textTransform: 'uppercase',
-          textShadow: '0 0 20px #c9a84c55',
+          textShadow: '0 0 20px rgba(201,168,76,0.4)',
           pointerEvents: 'auto',
         }}>
           AC
         </span>
         <div style={{ display: 'flex', gap: '2.4rem', pointerEvents: 'auto' }}>
           {[
-            { label: 'About', href: '/about' },
-            { label: 'Builds', href: '/builds' },
+            { label: 'Gallery', href: '/gallery' },
+            { label: 'About',   href: '/about'   },
+            { label: 'Builds',  href: '/builds'  },
             { label: 'Contact', href: '/contact' },
           ].map(({ label, href }) => (
             <Link
@@ -80,15 +138,15 @@ export default function Home() {
               href={href}
               style={{
                 fontFamily: 'Inter, sans-serif',
-                fontSize: '0.7rem',
-                letterSpacing: '0.2em',
-                color: 'rgba(255,255,255,0.45)',
+                fontSize: '0.68rem',
+                letterSpacing: '0.22em',
+                color: 'rgba(255,255,255,0.4)',
                 textDecoration: 'none',
                 textTransform: 'uppercase',
                 transition: 'color 0.3s ease',
               }}
               onMouseOver={e => (e.currentTarget.style.color = '#c9a84c')}
-              onMouseOut={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
+              onMouseOut={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
             >
               {label}
             </Link>
@@ -96,170 +154,153 @@ export default function Home() {
         </div>
       </motion.nav>
 
-      {/* Hero tagline */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.8, duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
-        style={{
-          position: 'absolute',
-          bottom: '10%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 10,
-          textAlign: 'center',
-          pointerEvents: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <p style={{
-          fontFamily: '"Cormorant Garamond", serif',
-          fontSize: 'clamp(1.1rem, 2.4vw, 1.9rem)',
-          fontStyle: 'italic',
-          color: 'rgba(255,255,255,0.7)',
-          letterSpacing: '0.08em',
-          margin: 0,
-          textShadow: '0 0 30px rgba(201,168,76,0.2)',
-        }}>
-          I build systems, discipline, and legacy.
-        </p>
-        <p style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: '0.6rem',
-          letterSpacing: '0.35em',
-          color: 'rgba(255,255,255,0.2)',
-          textTransform: 'uppercase',
-          marginTop: '0.9rem',
-        }}>
-          Click a globe to explore
-        </p>
-      </motion.div>
+      {/* ── Hero center block ── */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 0,
+        textAlign: 'center',
+        padding: '0 2rem',
+        userSelect: 'none',
+      }}>
 
-      {/* Expanded memory overlay */}
-      <AnimatePresence>
-        {selected && (
-          <motion.div
-            key={selected.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-            onClick={() => setSelected(null)}
+        {/* Identity tags */}
+        <motion.p
+          initial={{ opacity: 0, letterSpacing: '0.6em' }}
+          animate={{ opacity: 1, letterSpacing: '0.32em' }}
+          transition={{ delay: 0.6, duration: 1.4, ease: 'easeOut' }}
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 'clamp(0.55rem, 1.2vw, 0.72rem)',
+            letterSpacing: '0.32em',
+            color: '#c9a84c',
+            textTransform: 'uppercase',
+            marginBottom: '2.4rem',
+            opacity: 0.85,
+          }}
+        >
+          Father · Builder · Martial Artist
+        </motion.p>
+
+        {/* Name — massive display */}
+        <div style={{
+          fontFamily: '"Cormorant Garamond", serif',
+          fontWeight: 300,
+          fontSize: 'clamp(5rem, 15vw, 14rem)',
+          lineHeight: 0.88,
+          color: '#ffffff',
+          letterSpacing: '-0.01em',
+          marginBottom: '0',
+        }}>
+          <div><SplitWord word={FIRST} delay={0.9} /></div>
+          <div><SplitWord word={LAST}  delay={1.3} /></div>
+        </div>
+
+        {/* Gold divider line */}
+        <motion.div
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 2.2, duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            width: 'clamp(80px, 18vw, 220px)',
+            height: '1px',
+            background: 'linear-gradient(to right, transparent, #c9a84c, transparent)',
+            margin: '2.2rem 0 2.0rem',
+            transformOrigin: 'center',
+          }}
+        />
+
+        {/* Tagline */}
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 2.5, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            fontFamily: '"Cormorant Garamond", serif',
+            fontStyle: 'italic',
+            fontSize: 'clamp(1rem, 2.2vw, 1.5rem)',
+            color: 'rgba(255,255,255,0.55)',
+            letterSpacing: '0.04em',
+            lineHeight: 1.6,
+            maxWidth: '560px',
+            marginBottom: '3rem',
+          }}
+        >
+          Every system I design, every discipline I build —<br />
+          it is all for this table.
+        </motion.p>
+
+        {/* CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 3.0, duration: 1.0, ease: 'easeOut' }}
+        >
+          <Link
+            href="/gallery"
             style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 50,
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(0,0,0,0.82)',
-              backdropFilter: 'blur(22px)',
-              WebkitBackdropFilter: 'blur(22px)',
-              cursor: 'pointer',
+              gap: '0.8rem',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '0.68rem',
+              letterSpacing: '0.28em',
+              textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.5)',
+              textDecoration: 'none',
+              border: '1px solid rgba(201,168,76,0.3)',
+              padding: '0.85rem 2.2rem',
+              transition: 'all 0.4s ease',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.color = '#c9a84c';
+              e.currentTarget.style.borderColor = '#c9a84c';
+              e.currentTarget.style.background = 'rgba(201,168,76,0.06)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.5)';
+              e.currentTarget.style.borderColor = 'rgba(201,168,76,0.3)';
+              e.currentTarget.style.background = 'transparent';
             }}
           >
-            <motion.div
-              initial={{ scale: 0.82, y: 30, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.88, y: 20, opacity: 0 }}
-              transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-              onClick={e => e.stopPropagation()}
-              style={{
-                position: 'relative',
-                maxWidth: '640px',
-                width: '90vw',
-                cursor: 'default',
-                background: 'rgba(10,8,6,0.55)',
-                border: '1px solid rgba(201,168,76,0.18)',
-                borderRadius: '2px',
-                overflow: 'hidden',
-              }}
-            >
-              {/* Photo */}
-              <div style={{ position: 'relative', width: '100%', paddingBottom: '66%', overflow: 'hidden' }}>
-                <img
-                  src={selected.img}
-                  alt={selected.title}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                {/* Gold gradient overlay at bottom */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: '55%',
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
-                }} />
-              </div>
+            Enter the Constellation
+            <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>→</span>
+          </Link>
+        </motion.div>
+      </div>
 
-              {/* Text panel */}
-              <div style={{ padding: '1.6rem 2rem 2rem' }}>
-                <p style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: '0.62rem',
-                  letterSpacing: '0.3em',
-                  color: '#c9a84c',
-                  textTransform: 'uppercase',
-                  marginBottom: '0.6rem',
-                }}>
-                  {selected.category}
-                </p>
-                <h2 style={{
-                  fontFamily: '"Cormorant Garamond", serif',
-                  fontSize: 'clamp(1.6rem, 3vw, 2.2rem)',
-                  color: '#fff',
-                  margin: '0 0 0.9rem',
-                  lineHeight: 1.1,
-                }}>
-                  {selected.title}
-                </h2>
-                <p style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: '0.85rem',
-                  color: 'rgba(255,255,255,0.6)',
-                  lineHeight: 1.7,
-                  margin: 0,
-                }}>
-                  {selected.caption}
-                </p>
-              </div>
+      {/* ── Scroll indicator ── */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.4, 0] }}
+        transition={{ delay: 3.8, duration: 2.0, repeat: Infinity, repeatDelay: 1.5 }}
+        style={{
+          position: 'absolute',
+          bottom: '2.4rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.4rem',
+          pointerEvents: 'none',
+        }}
+      >
+        <div style={{
+          width: '1px',
+          height: '40px',
+          background: 'linear-gradient(to bottom, transparent, rgba(201,168,76,0.5))',
+        }} />
+      </motion.div>
 
-              {/* Close button */}
-              <button
-                onClick={() => setSelected(null)}
-                style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: '50%',
-                  width: '2rem',
-                  height: '2rem',
-                  color: 'rgba(255,255,255,0.6)',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'border-color 0.2s',
-                }}
-                onMouseOver={e => (e.currentTarget.style.borderColor = '#c9a84c')}
-                onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)')}
-              >
-                ×
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </main>
   );
 }
