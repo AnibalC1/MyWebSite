@@ -66,7 +66,7 @@ export default function Home() {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            opacity: 0.18,
+            opacity: 0.45,
             filter: 'grayscale(30%) contrast(1.1)',
           }}
         >
@@ -80,8 +80,8 @@ export default function Home() {
         inset: 0,
         zIndex: 1,
         background: [
-          'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.82) 100%)',
-          'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.85) 100%)',
+          'radial-gradient(ellipse 80% 80% at 50% 50%, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%)',
+          'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.6) 100%)',
         ].join(', '),
       }} />
 
