@@ -330,6 +330,45 @@ function CameraRig({ mouse }: { mouse: React.MutableRefObject<[number, number]> 
   return null;
 }
 
+
+// ─── Sound Engine ─────────────────────────────────────────────────────────────
+
+function createAudioCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  return new (window.AudioContext || (window as any).webkitAudioContext)();
+}
+
+function playTone(ctx: AudioContext, freq0: number, freq1: number, duration: number, volume: number, type: OscillatorType = 'sine') {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq0, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(freq1, ctx.currentTime + duration * 0.8);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.04);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration + 0.05);
+}
+
+function startAmbient(ctx: AudioContext): () => void {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+  lfo.connect(lfoGain); lfoGain.connect(gain.gain);
+  lfo.frequency.value = 0.08;
+  lfoGain.gain.value = 0.008;
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.value = 38;
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 3);
+  lfo.start(); osc.start();
+  return () => { gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 2); setTimeout(() => { osc.stop(); lfo.stop(); }, 2500); };
+}
+
 // ─── Exported Scene ───────────────────────────────────────────────────────────
 
 export interface GlobeSceneProps {
@@ -338,6 +377,18 @@ export interface GlobeSceneProps {
 
 export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const mouse = useRef<[number, number]>([0, 0]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const ambientStopRef = useRef<(() => void) | null>(null);
+
+  const ensureAudio = useCallback(() => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = createAudioCtx();
+      if (audioCtxRef.current) ambientStopRef.current = startAmbient(audioCtxRef.current);
+    } else if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  }, []);
   const hoveredIdRef = useRef<string | null>(null);
   const exitCooldown = useRef<{ id: string; until: number } | null>(null);
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
@@ -372,6 +423,8 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
     if (!gid) {
       isDragging.current = true;
       lastMouse.current = { x: e.clientX, y: e.clientY };
+      const ctx = ensureAudio();
+      if (ctx) playTone(ctx, 80, 60, 0.4, 0.025, 'triangle');
       return;
     }
     const d = dragRef.current;
