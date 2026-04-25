@@ -156,7 +156,11 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   // Cluster state — target positions for time-related photos on hover
   const clusterTgts =useRef<THREE.Vector3[]>(PHOTOS.map(()=>new THREE.Vector3()));
   const prevHovRef  =useRef(-1);
-  const tiIdxsRef   =useRef<number[]>([]); // indices of time-related photos for current hover
+  const prevSelRef  =useRef(-1);
+  const tiIdxsRef   =useRef<number[]>([]); // indices of time-related photos for current hover/select
+  const tiSetRef    =useRef(new Set<number>());
+  const connSetRef  =useRef(new Set<number>());
+  const orbitPhase  =useRef(0);
 
   // Texture loading
   useEffect(()=>{
@@ -180,39 +184,46 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   useFrame(({camera},delta) => {
     const h=globalHoverRef.current, s=globalSelectRef.current;
     const anyHov=h>=0, anySel=s>=0;
-    const connSet=anySel?new Set(CONNS[s].map(c=>c.toIdx)):new Set<number>();
 
-    // ── Recompute cluster targets when hover changes
-    if(h !== prevHovRef.current){
+    // ── Recompute cluster targets when hover OR select changes — no allocations in hot path
+    const effectivePivot=h>=0?h:s;
+    if(h !== prevHovRef.current || s !== prevSelRef.current){
       prevHovRef.current=h;
+      prevSelRef.current=s;
       tiIdxsRef.current=[];
-      if(h>=0){
-        const hovTs=PHOTOS[h].ts;
-        // Find all photos within ±30 days, sort by |ts delta|, cap at 30
-        const related=[];
+      tiSetRef.current.clear();
+      connSetRef.current.clear();
+      if(s>=0) CONNS[s].forEach(c=>connSetRef.current.add(c.toIdx));
+      if(effectivePivot>=0){
+        const pivotTs=PHOTOS[effectivePivot].ts;
+        const related:Array<{j:number;dt:number}>=[];
         for(let j=0;j<N;j++){
-          if(j===h)continue;
-          const dt=Math.abs(PHOTOS[j].ts-hovTs);
+          if(j===effectivePivot)continue;
+          const dt=Math.abs(PHOTOS[j].ts-pivotTs);
           if(dt<=THIRTY_DAYS)related.push({j,dt});
         }
         related.sort((a,b)=>a.dt-b.dt);
         const capped=related.slice(0,30);
         tiIdxsRef.current=capped.map(r=>r.j);
-        // Pre-compute cluster offsets in world space using fibonacci mini-sphere
+        capped.forEach(({j})=>tiSetRef.current.add(j));
         const cnt=capped.length;
         const phiG=Math.PI*(3-Math.sqrt(5));
-        // We'll update these each frame relative to hovered mesh — store offsets only
         capped.forEach(({j},k)=>{
           const y=1-(k/Math.max(cnt-1,1))*2;
           const r=Math.sqrt(Math.max(0,1-y*y));
           const theta=phiG*k;
-          const radius=0.35;
-          clusterTgts.current[j].set(r*Math.cos(theta)*radius, y*radius, r*Math.sin(theta)*radius);
+          clusterTgts.current[j].set(r*Math.cos(theta)*0.35, y*0.35, r*Math.sin(theta)*0.35);
         });
       }
     }
-    const tiSet=new Set(tiIdxsRef.current);
-    const hovMesh=h>=0?meshRefs.current[h]:null;
+
+    // ── Orbit phase — smoothly rotate cluster around pivot each frame
+    if(anyHov||anySel) orbitPhase.current+=delta*0.22;
+
+    const tiSet=tiSetRef.current;
+    const anyActive=anyHov||anySel;
+    const isClickedCluster=!anyHov&&anySel; // cluster persisting after click, mouse moved away
+    const activeMesh=effectivePivot>=0?meshRefs.current[effectivePivot]:null;
 
     // Get globe world quaternion once
     if(globeRef.current) globeRef.current.getWorldQuaternion(_gQ);
@@ -224,24 +235,24 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       const mesh=meshRefs.current[i];const mat=matRefs.current[i];
       if(!mesh||!mat)continue;
 
-      const iAmHov=i===h, iAmSel=i===s, iAmConn=connSet.has(i);
+      const iAmHov=i===h, iAmSel=i===s, iAmConn=connSetRef.current.has(i);
 
       // ── Scale target
       const iAmTi=tiSet.has(i);
       let tSc:number;
-      if(iAmHov||iAmSel) tSc=0.18;          // ~1.5× base
+      if(iAmHov||iAmSel) tSc=0.18;
       else if(iAmConn) tSc=0.135;
-      else if(iAmTi) tSc=0.132;             // 1.1× base — time-clustered
-      else if(anyHov||anySel) tSc=0.09;
+      else if(iAmTi) tSc=isClickedCluster?0.11:0.132;
+      else if(anyActive) tSc=0.09;
       else tSc=0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
       // ── Opacity target
-      const tOp=(iAmHov||iAmSel)?1.0:iAmConn?0.80:iAmTi?0.85:(anyHov||anySel)?0.08:0.48;
+      const tOp=(iAmHov||iAmSel)?1.0:iAmConn?0.80:iAmTi?(isClickedCluster?0.92:0.85):anyActive?0.08:0.48;
       opacs.current[i]+=(tOp-opacs.current[i])*Math.min(delta*9,1);
 
       // ── Tint target (0=cyan holographic, 1=full color)
-      const tTint=(iAmHov||iAmSel)?1:iAmConn?0.5:iAmTi?1:0;
+      const tTint=(iAmHov||iAmSel)?1:iAmConn?0.5:iAmTi?(isClickedCluster?1:0.7):0;
       tintTs.current[i]+=(tTint-tintTs.current[i])*Math.min(delta*9,1);
 
       // ── Cinematic rotation — spring back to 0
@@ -256,16 +267,22 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       _wPos.copy(PPOS[i].base).applyQuaternion(_gQ);
 
       // ── Bob (only when nothing hovered/selected)
-      if(!anyHov&&!anySel){
+      if(!anyActive){
         bobs.current[i]+=delta*0.55;
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      // ── Position: cluster time-related photos around hovered photo
-      if(anyHov && iAmTi && hovMesh){
-        // Offset is stored as displacement from hovered mesh center
-        _clusterTgt.copy(hovMesh.position).add(clusterTgts.current[i]);
-        mesh.position.lerp(_clusterTgt, Math.min(delta*3.5,1));
+      // ── Position: orbit time-related photos around hovered/selected photo
+      if(anyActive && iAmTi && activeMesh){
+        const off=clusterTgts.current[i];
+        const scaleF=isClickedCluster?0.18/0.35:1.0; // tighten on click
+        const cos=Math.cos(orbitPhase.current), sin=Math.sin(orbitPhase.current);
+        _clusterTgt.set(
+          activeMesh.position.x+(off.x*cos-off.z*sin)*scaleF,
+          activeMesh.position.y+off.y*scaleF,
+          activeMesh.position.z+(off.x*sin+off.z*cos)*scaleF
+        );
+        mesh.position.lerp(_clusterTgt, Math.min(delta*5,1));
       } else {
         mesh.position.lerp(_wPos, Math.min(delta*12,1));
       }
