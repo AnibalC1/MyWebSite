@@ -409,7 +409,10 @@ export function GlobeScene({ onSelect }: GlobeSceneProps) {
   const ensureAudio = useCallback(() => {
     if (!audioCtxRef.current) {
       audioCtxRef.current = createAudioCtx();
-      if (audioCtxRef.current) ambientStopRef.current = startAmbient(audioCtxRef.current);
+      if (audioCtxRef.current) {
+        audioCtxRef.current.resume(); // Chrome creates context suspended — resume immediately
+        ambientStopRef.current = startAmbient(audioCtxRef.current);
+      }
     } else if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
