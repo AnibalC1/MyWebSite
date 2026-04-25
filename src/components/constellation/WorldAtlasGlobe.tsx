@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
@@ -332,35 +332,7 @@ function GlobeGroup({
   );
 }
 
-// ─── Camera rig ───────────────────────────────────────────────────────────────
-function CameraRig() {
-  const { camera } = useThree();
-  const target = useRef(new THREE.Vector3(0, 0, 7));
-  const mouse  = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      mouse.current = {
-        x: (e.clientX / window.innerWidth  - 0.5) * 2,
-        y: (e.clientY / window.innerHeight - 0.5) * 2,
-      };
-    };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
-
-  useFrame(() => {
-    target.current.set(
-      mouse.current.x * 0.6,
-      -mouse.current.y * 0.4,
-      7,
-    );
-    camera.position.lerp(target.current, 0.04);
-    camera.lookAt(0, 0, 0);
-  });
-
-  return null;
-}
+// CameraRig replaced by OrbitControls in Canvas
 
 // ─── Info panel (DOM overlay) ─────────────────────────────────────────────────
 const PHOTOS = [
@@ -503,19 +475,13 @@ export default function WorldAtlasGlobe() {
       {/* Film grain */}
       <div className="grain-overlay" aria-hidden />
 
-      {/* Click-away to deselect */}
-      {selectedId && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 100, cursor: 'default' }}
-          onClick={() => setSelectedId(null)}
-        />
-      )}
+      {/* No click-away div — onPointerMissed on Canvas handles deselection */}
 
       {/* Three.js Canvas */}
       <Canvas
         camera={{ position: [0, 0, 7], fov: 48 }}
         gl={{ antialias: true, alpha: true }}
-        style={{ position: 'absolute', inset: 0 }}
+        style={{ position: 'absolute', inset: 0, pointerEvents: 'auto', cursor: 'grab' }}
         dpr={[1, 2]}
         onPointerMissed={() => setSelectedId(null)}
       >
@@ -530,15 +496,16 @@ export default function WorldAtlasGlobe() {
           selectedId={selectedId}
         />
 
-        <CameraRig />
+        {/* Orbit controls — drag to rotate, scroll to zoom, no pan */}
         <OrbitControls
+          makeDefault
           enablePan={false}
-          enableZoom={true}
-          zoomSpeed={0.5}
-          minDistance={4}
+          enableDamping
+          dampingFactor={0.06}
+          minDistance={3.5}
           maxDistance={12}
-          rotateSpeed={0.5}
-          autoRotate={false}
+          rotateSpeed={0.55}
+          zoomSpeed={0.7}
         />
 
         <EffectComposer>
