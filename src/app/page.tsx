@@ -7,6 +7,14 @@ import Link from 'next/link';
 const FIRST = 'ANIBAL';
 const LAST  = 'CABRAL';
 
+const HERO_VIDEOS = [
+  '/video/hero-1.mp4',
+  '/video/hero-2.mp4',
+  '/video/hero-3.mp4',
+  '/video/hero-4.mp4',
+  '/video/hero-5.mp4',
+];
+
 function SplitWord({ word, delay }: { word: string; delay: number }) {
   return (
     <span style={{ display: 'inline-block', overflow: 'hidden', lineHeight: 1 }}>
@@ -31,9 +39,12 @@ function SplitWord({ word, delay }: { word: string; delay: number }) {
 
 export default function Home() {
   const [ready, setReady] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    // Pick a random clip on every page load
+    setVideoSrc(HERO_VIDEOS[Math.floor(Math.random() * HERO_VIDEOS.length)]);
     const t = setTimeout(() => setReady(true), 80);
     return () => clearTimeout(t);
   }, []);
@@ -62,7 +73,6 @@ export default function Home() {
           muted
           loop
           playsInline
-          onEnded={e => { const v = e.currentTarget; v.currentTime = 0; v.play(); }}
           style={{
             width: '100%',
             height: '100%',
@@ -71,7 +81,7 @@ export default function Home() {
             filter: 'grayscale(20%) contrast(1.05)',
           }}
         >
-          <source src="/video/hero.mp4" type="video/mp4" />
+          {videoSrc && <source src={videoSrc} type="video/mp4" />}
         </video>
       </motion.div>
 
