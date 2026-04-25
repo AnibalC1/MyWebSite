@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import LogoSpin from '@/components/LogoSpin';
 
 const NAV_LINKS = [
   { href: '/gallery', label: 'Gallery' },
@@ -22,96 +23,86 @@ export default function Navigation() {
   }, []);
 
   return (
-    <nav
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-        transition: 'background 0.7s',
-        background: scrolled ? 'rgba(10,10,11,0.92)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(12px)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(201,168,76,0.1)' : 'none',
-      }}
-    >
+    <nav style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
+      transition: 'background 0.7s, backdrop-filter 0.7s',
+      background: scrolled ? 'rgba(10,10,11,0.92)' : 'transparent',
+      backdropFilter: scrolled ? 'blur(12px)' : 'none',
+      borderBottom: scrolled ? '1px solid rgba(201,168,76,0.1)' : 'none',
+      pointerEvents: 'none',
+    }}>
       <div style={{
-        maxWidth: '1280px', margin: '0 auto',
-        padding: '0 2rem',
-        height: '72px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '1.0rem 2.8rem',
+        pointerEvents: 'auto',
       }}>
-        {/* Spinning logo */}
-        <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-          <div style={{ position: 'relative', height: '60px', display: 'inline-block' }}>
-            <img
-              src="/logo.png"
-              alt=""
-              aria-hidden
-              className="logo-inner-spin"
-              style={{
-                position: 'absolute', top: 0, left: 0,
-                height: '60px', width: 'auto',
-                clipPath: 'circle(21% at 50% 46%)',
-                filter: 'drop-shadow(0 0 8px rgba(201,168,76,0.9))',
-              }}
-            />
-            <img
-              src="/logo.png"
-              alt="Anibal Cabral"
-              style={{
-                height: '60px', width: 'auto',
-                position: 'relative', zIndex: 1,
-                filter: 'drop-shadow(0 0 6px rgba(201,168,76,0.4))',
-                WebkitMaskImage: 'radial-gradient(circle 21% at 50% 46%, transparent 95%, black 100%)',
-                maskImage: 'radial-gradient(circle 21% at 50% 46%, transparent 95%, black 100%)',
-              }}
-            />
-          </div>
-        </Link>
+        <LogoSpin height={120} />
 
         {/* Desktop links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2.2rem' }}>
-          {NAV_LINKS.map(link => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2.4rem' }}>
+          {NAV_LINKS.map(({ href, label }) => (
             <Link
-              key={link.href}
-              href={link.href}
+              key={href}
+              href={href}
               style={{
-                fontFamily: '"Cormorant Garamond", serif',
-                fontSize: '0.62rem',
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '0.68rem',
                 letterSpacing: '0.22em',
-                color: 'rgba(255,255,255,0.4)',
+                color: 'rgba(255,255,255,0.45)',
                 textDecoration: 'none',
-                textTransform: 'uppercase' as const,
-                transition: 'color 0.3s',
+                textTransform: 'uppercase',
+                transition: 'color 0.3s ease',
               }}
               onMouseEnter={e => (e.currentTarget.style.color = '#c9a84c')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
             >
-              {link.label}
+              {label}
             </Link>
           ))}
         </div>
+
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label="Toggle menu"
+          style={{
+            display: 'none',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px',
+            color: 'rgba(255,255,255,0.6)',
+          }}
+          className="mobile-menu-btn"
+        >
+          <div style={{ width: '22px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <span style={{ height: '1px', background: 'currentColor', display: 'block', transition: 'all 0.3s', transform: menuOpen ? 'rotate(45deg) translateY(6px)' : 'none' }} />
+            <span style={{ height: '1px', background: 'currentColor', display: 'block', transition: 'all 0.3s', opacity: menuOpen ? 0 : 1 }} />
+            <span style={{ height: '1px', background: 'currentColor', display: 'block', transition: 'all 0.3s', transform: menuOpen ? 'rotate(-45deg) translateY(-6px)' : 'none' }} />
+          </div>
+        </button>
       </div>
 
-      {/* Mobile dropdown */}
       {menuOpen && (
         <div style={{
           background: 'rgba(10,10,11,0.97)',
           borderTop: '1px solid rgba(201,168,76,0.1)',
-          padding: '2rem',
-          display: 'flex', flexDirection: 'column', gap: '1.5rem',
+          padding: '2rem 2.8rem',
+          display: 'flex', flexDirection: 'column', gap: '1.6rem',
+          pointerEvents: 'auto',
         }}>
-          {NAV_LINKS.map(link => (
+          {NAV_LINKS.map(({ href, label }) => (
             <Link
-              key={link.href}
-              href={link.href}
+              key={href}
+              href={href}
               style={{
                 fontFamily: '"Cormorant Garamond", serif',
-                fontSize: '1.4rem',
-                color: 'rgba(255,255,255,0.8)',
-                textDecoration: 'none',
                 fontStyle: 'italic',
+                fontSize: '1.6rem',
+                color: 'rgba(255,255,255,0.85)',
+                textDecoration: 'none',
               }}
               onClick={() => setMenuOpen(false)}
             >
-              {link.label}
+              {label}
             </Link>
           ))}
         </div>

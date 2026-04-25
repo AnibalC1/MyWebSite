@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import Link from 'next/link';
+import LogoSpin from '@/components/LogoSpin';
 
 const CLIPS = [
   { src: '/video/hero-1.mp4', title: 'The Discipline' },
@@ -211,11 +212,9 @@ export default function VideosPage() {
           pointerEvents: screenIn ? 'auto' : 'none',
         }}
       >
-        <Link href="/">
-          <img src="/logo.png" alt="Anibal Cabral" style={{ height: '68px', width: 'auto', filter: 'drop-shadow(0 0 8px rgba(201,168,76,0.4))' }} />
-        </Link>
+        <LogoSpin height={120} />
         <div style={{ display: 'flex', gap: '2.2rem' }}>
-          {[['Gallery','/gallery'],['Videos','/videos'],['About','/about'],['Builds','/builds']].map(([label, href]) => (
+          {[['Gallery','/gallery'],['Videos','/videos'],['About','/about'],['Builds','/builds'],['Contact','/contact']].map(([label, href]) => (
             <Link key={href} href={href} style={{
               fontFamily: 'Inter, sans-serif', fontSize: '0.68rem', letterSpacing: '0.22em',
               color: href === '/videos' ? '#c9a84c' : 'rgba(255,255,255,0.35)',

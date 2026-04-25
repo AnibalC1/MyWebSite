@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import LogoSpin from '@/components/LogoSpin';
 
 const FIRST = 'ANIBAL';
 const LAST  = 'CABRAL';
@@ -193,10 +194,10 @@ export default function Home() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         gap: 0,
         textAlign: 'center',
-        padding: '0 2rem',
+        padding: '170px 2rem 2rem',
         userSelect: 'none',
       }}>
 
