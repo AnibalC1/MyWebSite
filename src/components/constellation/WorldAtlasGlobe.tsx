@@ -38,6 +38,7 @@ const _clearCol = new THREE.Color(1, 1, 1);          // full color on hover
 // Shared PlaneGeometry — 4:3 ratio, created once
 const SHARED_GEO = new THREE.PlaneGeometry(1.333, 1);
 SHARED_GEO.computeBoundingSphere(); // ensure frustum culling works
+const SHARED_HIT_GEO = new THREE.SphereGeometry(0.08, 6, 6); // hit detection sphere — invisible, static
 
 // ─── Geo helpers ─────────────────────────────────────────────────────────────
 function ll2v(lat:number,lon:number,r=R){
@@ -145,8 +146,16 @@ interface HoloProps{
 }
 
 function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChange,onSelect}:HoloProps){
-  const meshRefs=useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
+  // ── v8: TWO meshes per photo ──────────────────────────────────────────────────
+  // visRefs  = visual photo plane, raycast DISABLED — flies freely, no pointer events
+  // hitRefs  = invisible sphere, STAYS at globe base position, fires all pointer events
+  const visRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
+  const hitRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
   const matRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(PHOTOS.map(()=>null));
+
+  // Gold glow plane — single mesh that tracks the hovered visual position
+  const glowMat =useMemo(()=>new THREE.MeshBasicMaterial({color:'#c9a84c',transparent:true,opacity:0,depthTest:false}),[]);
+  const glowMesh=useMemo(()=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1.333*1.18,1.18),glowMat);m.renderOrder=8;return m;},[glowMat]);
 
   // Per-photo animation state (all refs — no useState = no glitches)
   const scales  =useRef(new Float32Array(N).fill(0.12));
@@ -231,7 +240,6 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
     const tiSet=tiSetRef.current;
     const anyActive=anyHov||anySel;
     const isClickedCluster=!anyHov&&anySel; // cluster persisting after click, mouse moved away
-    const activeMesh=effectivePivot>=0?meshRefs.current[effectivePivot]:null;
 
     // Get globe world quaternion once
     if(globeRef.current) globeRef.current.getWorldQuaternion(_gQ);
@@ -239,19 +247,28 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
 
     const t=performance.now()/1000;
 
+    // ── Hit spheres track globe rotation every frame (invisible, static hit targets)
     for(let i=0;i<N;i++){
-      const mesh=meshRefs.current[i];const mat=matRefs.current[i];
+      const hit=hitRefs.current[i];
+      if(hit){ _wPos.copy(PPOS[i].base).applyQuaternion(_gQ); hit.position.copy(_wPos); }
+    }
+
+    for(let i=0;i<N;i++){
+      const mesh=visRefs.current[i];const mat=matRefs.current[i];
       if(!mesh||!mat)continue;
+
+      // Keep hit sphere pinned to globe surface (always at _wPos before we modify it)
+      const hitMesh=hitRefs.current[i];
 
       const iAmHov=i===h, iAmSel=i===s, iAmConn=connSetRef.current.has(i);
 
       // ── Scale target
       const iAmTi=tiSet.has(i);
       let tSc:number;
-      if(iAmHov||iAmSel) tSc=0.18;        // center anchor
+      // v8: all clustered photos SAME SIZE — center = cluster = 0.18
+      if(iAmHov||iAmSel||iAmTi) tSc=isClickedCluster&&iAmTi?0.22:0.18;
       else if(iAmConn) tSc=0.135;
-      else if(iAmTi) tSc=isClickedCluster?0.22:0.18;  // same size as center; bigger on click
-      else if(anyActive) tSc=0.12;
+      else if(anyActive) tSc=0.09;
       else tSc=0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
@@ -279,6 +296,9 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         bobs.current[i]+=delta*0.55;
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
+
+      // Pin hit sphere to globe surface — never moves regardless of visual mesh position
+      if(hitMesh) hitMesh.position.copy(_wPos);
 
       // ── Position: hovered → stable screen center; cluster → ring around it
       const sc=stableScreenCtr.current;
@@ -314,6 +334,19 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       mat.color.copy(_col);
     }
 
+    // ── Gold glow — tracks hovered/selected visual mesh
+    const glowTarget=h>=0?visRefs.current[h]:s>=0?visRefs.current[s]:null;
+    if(glowTarget){
+      glowMesh.visible=true;
+      glowMesh.position.copy(glowTarget.position);
+      glowMesh.quaternion.copy(camera.quaternion);
+      glowMat.opacity=0.50+0.15*Math.sin(t*2.2);
+      glowMesh.scale.setScalar(scales.current[h>=0?h:s]);
+    } else {
+      glowMat.opacity+=(0-glowMat.opacity)*0.18;
+      if(glowMat.opacity<0.01) glowMesh.visible=false;
+    }
+
     // ── Connection lines
     const connData=anySel?CONNS[s]:[];
     connData.slice(0,12).forEach((c,li)=>{
@@ -338,7 +371,6 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
     } else { pinMat.opacity+=(0-pinMat.opacity)*0.18; }
   });
 
-  // Debounce ref to prevent flicker on fast sweeps
   const debounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const handleOver=(i:number)=>(e:{stopPropagation:()=>void})=>{
@@ -346,19 +378,23 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
     if(debounceRef.current) clearTimeout(debounceRef.current);
     if(globalHoverRef.current===i) return;
     globalHoverRef.current=i;
-    // Kick cinematic rotation — random direction and magnitude
-    rotYs.current[i]=(Math.random()>0.5?1:-1)*(0.42+Math.random()*0.18);  // 24–34°
-    rotZs.current[i]=(Math.random()>0.5?1:-1)*(0.08+Math.random()*0.11);  // 5–11°
+    rotYs.current[i]=(Math.random()>0.5?1:-1)*(0.42+Math.random()*0.18);
+    rotZs.current[i]=(Math.random()>0.5?1:-1)*(0.08+Math.random()*0.11);
     onHoverChange(i);
     document.body.style.cursor='pointer';
   };
-  const handleOut=()=>{
+  // v8: handleOut checks which photo fired — hit sphere stays on globe so only genuine
+  // mouse-exit fires this. 80ms debounce guards against micro-jitter between spheres.
+  const handleOut=(i:number)=>()=>{
+    if(globalHoverRef.current!==i) return; // already moved to a different photo
     if(debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current=setTimeout(()=>{
-      globalHoverRef.current=-1;
-      onHoverChange(-1);
-      document.body.style.cursor='';
-    },100);
+      if(globalHoverRef.current===i){ // still same photo after debounce
+        globalHoverRef.current=-1;
+        onHoverChange(-1);
+        document.body.style.cursor='';
+      }
+    },80);
   };
   const handleClick=(i:number)=>(e:{stopPropagation:()=>void})=>{
     e.stopPropagation();
@@ -367,21 +403,36 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
 
   return(
     <group>
+      {/* Visual photo planes — raycast disabled, fly freely to center */}
       {PHOTOS.map((_,i)=>(
-        <mesh key={i}
+        <mesh key={`vis-${i}`}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ref={(el:any)=>{meshRefs.current[i]=el;}}
+          ref={(el:any)=>{visRefs.current[i]=el;}}
           geometry={SHARED_GEO}
           position={PPOS[i].base}
-          renderOrder={7}
-          onPointerOver={handleOver(i)}
-          onPointerOut={handleOut}
-          onClick={handleClick(i)}
+          renderOrder={9}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          raycast={()=>{}}
         >
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <meshBasicMaterial ref={(el:any)=>{matRefs.current[i]=el;}} color={_tintCol.clone()} transparent opacity={0.48} side={THREE.DoubleSide} depthTest={false}/>
         </mesh>
       ))}
+      {/* Invisible hit spheres — STATIC on globe, fire all pointer events */}
+      {PHOTOS.map((_,i)=>(
+        <mesh key={`hit-${i}`}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ref={(el:any)=>{hitRefs.current[i]=el;}}
+          position={PPOS[i].base}
+          onPointerOver={handleOver(i)}
+          onPointerOut={handleOut(i)}
+          onClick={handleClick(i)}
+        >
+          <sphereGeometry args={[0.07,8,8]}/>
+          <meshBasicMaterial visible={false}/>
+        </mesh>
+      ))}
+      <primitive object={glowMesh}/>
       <primitive object={pinLine}/>
       {cLines.map((l,i)=><primitive key={i} object={l}/>)}
     </group>
