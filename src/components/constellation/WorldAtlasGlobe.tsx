@@ -266,9 +266,9 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       const iAmTi=tiSet.has(i);
       let tSc:number;
       // v8: all clustered photos SAME SIZE — center = cluster = 0.18
-      if(iAmHov||iAmSel||iAmTi) tSc=isClickedCluster&&iAmTi?0.26:0.22;
-      else if(iAmConn) tSc=0.135;
-      else if(anyActive) tSc=0.09;
+      if(iAmHov||iAmSel||iAmTi) tSc=0.26;
+      else if(iAmConn) tSc=0.14;
+      else if(anyActive) tSc=0.06;
       else tSc=0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
@@ -318,7 +318,6 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       }
       mesh.scale.setScalar(scales.current[i]);
       // unique fractional renderOrder per tier — fixes depthTest:false flicker; inactive=9 not 8 (avoids glow mesh at 8)
-      mesh.renderOrder = iAmHov ? 12 : iAmSel ? 11 : iAmTi ? (9 + i/N) : 9;
       mesh.renderOrder = iAmHov ? 12 : iAmSel ? 11 : iAmTi ? (9 + i/N) : 9;
 
       // ── Billboard: face camera (world-space mesh, no parent transform)
