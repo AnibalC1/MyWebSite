@@ -219,20 +219,20 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         tiIdxsRef.current=capped.map(r=>r.j);
         capped.forEach(({j})=>tiSetRef.current.add(j));
         // Flat ring layout — inner ring (≤10), outer ring (overflow)
-        const INNER_MAX=10;
+        const INNER_MAX=8;
         const inner=capped.slice(0,Math.min(capped.length,INNER_MAX));
-        const outer=capped.slice(INNER_MAX,Math.min(capped.length,INNER_MAX+16));
+        const outer=capped.slice(INNER_MAX,Math.min(capped.length,INNER_MAX+12));
         ringAngles.current.fill(0); ringRadii.current.fill(0);
         // Lock screen center now — stable for this entire hover session
         stableScreenCtr.current.copy(_V6_LOCAL).applyMatrix4(camera.matrixWorld);
         inner.forEach(({j},k)=>{
           ringAngles.current[j]=(k/inner.length)*Math.PI*2;
-          ringRadii.current[j]=0.55;  // ring radius for scale 0.26 photos
+          ringRadii.current[j]=0.60;  // r≥0.543 for 8 photos@0.26scale — no overlap
         });
         const outerStep=outer.length>0?Math.PI/outer.length:0;
         outer.forEach(({j},k)=>{
           ringAngles.current[j]=(k/outer.length)*Math.PI*2+outerStep;
-          ringRadii.current[j]=0.92;
+          ringRadii.current[j]=0.88;
         });
       }
     }
