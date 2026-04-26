@@ -307,11 +307,8 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       } else if(anyActive && iAmTi && ringRadii.current[i]>0){
         const ang=ringAngles.current[i];
         const rad=ringRadii.current[i]*(isClickedCluster?0.60:1.0);
-        _clusterTgt.set(
-          _screenCtr.x+Math.cos(ang)*rad,
-          _screenCtr.y+Math.sin(ang)*rad,
-          _screenCtr.z-0.05
-        );
+        // Camera-space ring: offset in screen plane regardless of camera orbit
+        _clusterTgt.set(Math.cos(ang)*rad, Math.sin(ang)*rad, -3.5).applyMatrix4(camera.matrixWorld);
         mesh.position.lerp(_clusterTgt, Math.min(delta*5,1));
       } else {
         mesh.position.lerp(_wPos, Math.min(delta*12,1));
