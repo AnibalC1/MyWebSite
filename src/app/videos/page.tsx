@@ -11,6 +11,7 @@ const CLIPS = [
   { src: '/video/hero-3.mp4', title: 'The Ground'     },
   { src: '/video/hero-4.mp4', title: 'The Work'       },
   { src: '/video/hero-5.mp4', title: 'The Gym'        },
+  { src: '/video/bjj-01.mp4', title: 'The Choke'     },
 ] as const;
 const N = CLIPS.length;
 
