@@ -12,6 +12,8 @@ import { MEMORIES, type Memory } from '@/data/memories';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FOCUSED_VISUAL_RADIUS = 1.6; // all focused globes reach this world-space radius
+const CLUSTER_VISUAL_R = 0.38;    // uniform visual radius for ALL globes in cluster mode
+const RING_RADIUS      = 1.65;    // ring globe center distance — math-verified no overlap at this radius
 
 // Each globe gets its own pitch — pentatonic, warm
 const GLOBE_PITCHES: Record<string, [number, number]> = {
@@ -186,6 +188,9 @@ const Globe = memo(function Globe({
   // Normalize focus scale: all focused globes reach FOCUSED_VISUAL_RADIUS world units
   const focusedScale = FOCUSED_VISUAL_RADIUS / def.radius;
 
+  // Stable index of this globe in GLOBE_DEFS — used to assign ring position
+  const myIdx = useMemo(() => GLOBE_DEFS.findIndex(g => g.id === def.id), [def.id]);
+
   useEffect(() => {
     if (groupRef.current) {
       groupRef.current.position.set(basePos.x, basePos.y, basePos.z);
@@ -203,24 +208,38 @@ const Globe = memo(function Globe({
     const anyHovered = hoveredIdRef.current !== null;
     activeRef.current = isHovered;
 
-    // Scale — all focused globes reach the same absolute visual size
-    const targetScale = isHovered ? focusedScale : (anyHovered ? 0.72 : 1.0);
+    // ── Cluster mode: uniform scale for center + all ring globes ─────────────
+    const clusterScale = CLUSTER_VISUAL_R / def.radius;
+    const targetScale = (isHovered || anyHovered) ? clusterScale : 1.0;
     g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, targetScale, 0.09));
 
-    // Position
+    // ── Position ──────────────────────────────────────────────────────────────
     const angle = t.current * def.orbitSpeed + orbPhase;
     const orbX = Math.cos(angle) * orbR;
     const orbZ = Math.sin(angle) * orbR;
     const fy = 0.20 * Math.sin(t.current * 0.38 + orbPhase * 1.3);
 
     if (isHovered) {
+      // Fly to center-front
       g.position.x = THREE.MathUtils.lerp(g.position.x, 0, 0.07);
       g.position.y = THREE.MathUtils.lerp(g.position.y, 0, 0.07);
       g.position.z = THREE.MathUtils.lerp(g.position.z, 3.2, 0.07);
+    } else if (anyHovered) {
+      // Arrange in a neat ring around the center globe — no overlapping
+      const hoveredIdx = GLOBE_DEFS.findIndex(g => g.id === hoveredIdRef.current);
+      const ringIdx = myIdx < hoveredIdx ? myIdx : myIdx - 1;
+      const ringN = GLOBE_DEFS.length - 1; // 10 satellites
+      const ringAngle = (ringIdx / ringN) * Math.PI * 2 - Math.PI / 2; // start top
+      const ringX = RING_RADIUS * Math.cos(ringAngle);
+      const ringY = RING_RADIUS * Math.sin(ringAngle) * 0.72; // slight vertical squish
+      g.position.x = THREE.MathUtils.lerp(g.position.x, ringX, 0.06);
+      g.position.y = THREE.MathUtils.lerp(g.position.y, ringY, 0.06);
+      g.position.z = THREE.MathUtils.lerp(g.position.z, 2.8, 0.06);
     } else {
+      // Normal orbit
       g.position.x = orbX;
       g.position.y = basePos.y + fy;
-      g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ + (anyHovered ? -1.2 : 0), 0.05);
+      g.position.z = THREE.MathUtils.lerp(g.position.z, orbZ, 0.05);
     }
 
     // Rotation — each globe has its own isolated momentum
