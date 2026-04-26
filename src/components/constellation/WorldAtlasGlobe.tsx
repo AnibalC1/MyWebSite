@@ -227,12 +227,12 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         stableScreenCtr.current.copy(_V6_LOCAL).applyMatrix4(camera.matrixWorld);
         inner.forEach(({j},k)=>{
           ringAngles.current[j]=(k/inner.length)*Math.PI*2;
-          ringRadii.current[j]=0.50;  // larger — fits photos at same scale as center
+          ringRadii.current[j]=0.55;  // ring radius for scale 0.26 photos
         });
         const outerStep=outer.length>0?Math.PI/outer.length:0;
         outer.forEach(({j},k)=>{
           ringAngles.current[j]=(k/outer.length)*Math.PI*2+outerStep;
-          ringRadii.current[j]=0.85;
+          ringRadii.current[j]=0.92;
         });
       }
     }
@@ -273,7 +273,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
       // ── Opacity target
-      const tOp=(iAmHov||iAmSel)?1.0:iAmConn?0.80:iAmTi?(isClickedCluster?1.0:0.88):anyActive?0.08:0.48;
+      const tOp=(iAmHov||iAmSel||iAmTi)?1.0:iAmConn?0.80:anyActive?0.05:0.48;
       opacs.current[i]+=(tOp-opacs.current[i])*Math.min(delta*9,1);
 
       // ── Tint target (0=cyan holographic, 1=full color)
@@ -310,13 +310,15 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         _clusterTgt.set(
           sc.x+Math.cos(ang)*rad,
           sc.y+Math.sin(ang)*rad,
-          sc.z+0.15            // slightly in front of center photo — never obscured
+          sc.z-0.05           // slightly behind center so center (renderOrder 12) stays on top
         );
         mesh.position.lerp(_clusterTgt, Math.min(delta*5,1));
       } else {
         mesh.position.lerp(_wPos, Math.min(delta*12,1));
       }
       mesh.scale.setScalar(scales.current[i]);
+      // unique fractional renderOrder per tier — fixes depthTest:false flicker; inactive=9 not 8 (avoids glow mesh at 8)
+      mesh.renderOrder = iAmHov ? 12 : iAmSel ? 11 : iAmTi ? (9 + i/N) : 9;
       mesh.renderOrder = iAmHov ? 12 : iAmSel ? 11 : iAmTi ? (9 + i/N) : 9;
 
       // ── Billboard: face camera (world-space mesh, no parent transform)
