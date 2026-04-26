@@ -155,7 +155,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
 
   // Gold glow plane — single mesh that tracks the hovered visual position
   const glowMat =useMemo(()=>new THREE.MeshBasicMaterial({color:'#c9a84c',transparent:true,opacity:0,depthTest:false}),[]);
-  const glowMesh=useMemo(()=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1.333*1.04,1.04),glowMat);m.renderOrder=8;return m;},[glowMat]);
+  const glowMesh=useMemo(()=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1.333,1.0),glowMat);m.renderOrder=8;return m;},[glowMat]);
 
   // Per-photo animation state (all refs — no useState = no glitches)
   const scales  =useRef(new Float32Array(N).fill(0.12));
