@@ -196,6 +196,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   useFrame(({camera},delta) => {
     const h=globalHoverRef.current, s=globalSelectRef.current;
     const anyHov=h>=0, anySel=s>=0;
+    _screenCtr.set(0,0,-3.5).applyMatrix4(camera.matrixWorld);
 
     // ── Recompute cluster targets when hover OR select changes — no allocations in hot path
     const effectivePivot=h>=0?h:s;
@@ -208,14 +209,16 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       if(s>=0) CONNS[s].forEach(c=>connSetRef.current.add(c.toIdx));
       if(effectivePivot>=0){
         const pivotTs=PHOTOS[effectivePivot].ts;
-        const related:Array<{j:number;dt:number}>=[];
+        const pivotCluster=PHOTOS[effectivePivot].cluster;
+        const related:Array<{j:number;dt:number;pri:number}>=[];
         for(let j=0;j<N;j++){
           if(j===effectivePivot)continue;
           const dt=Math.abs(PHOTOS[j].ts-pivotTs);
-          if(dt<=THIRTY_DAYS)related.push({j,dt});
+          const sameCluster=PHOTOS[j].cluster===pivotCluster;
+          if(sameCluster||dt<=THIRTY_DAYS) related.push({j,dt,pri:sameCluster?0:1});
         }
-        related.sort((a,b)=>a.dt-b.dt);
-        const capped=related.slice(0,30);
+        related.sort((a,b)=>a.pri-b.pri||a.dt-b.dt);
+        const capped=related.slice(0,20);
         tiIdxsRef.current=capped.map(r=>r.j);
         capped.forEach(({j})=>tiSetRef.current.add(j));
         // Flat ring layout — inner ring (≤10), outer ring (overflow)
@@ -223,8 +226,6 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
         const inner=capped.slice(0,Math.min(capped.length,INNER_MAX));
         const outer=capped.slice(INNER_MAX,Math.min(capped.length,INNER_MAX+12));
         ringAngles.current.fill(0); ringRadii.current.fill(0);
-        // Lock screen center now — stable for this entire hover session
-        stableScreenCtr.current.copy(_V6_LOCAL).applyMatrix4(camera.matrixWorld);
         inner.forEach(({j},k)=>{
           ringAngles.current[j]=(k/inner.length)*Math.PI*2;
           ringRadii.current[j]=0.60;  // r≥0.543 for 8 photos@0.26scale — no overlap
@@ -301,16 +302,15 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       if(hitMesh) hitMesh.position.copy(_wPos);
 
       // ── Position: hovered → stable screen center; cluster → ring around it
-      const sc=stableScreenCtr.current;
       if(iAmHov||iAmSel){
-        mesh.position.lerp(sc, Math.min(delta*6,1));
+        mesh.position.lerp(_screenCtr, Math.min(delta*12,1));
       } else if(anyActive && iAmTi && ringRadii.current[i]>0){
         const ang=ringAngles.current[i];
         const rad=ringRadii.current[i]*(isClickedCluster?0.60:1.0);
         _clusterTgt.set(
-          sc.x+Math.cos(ang)*rad,
-          sc.y+Math.sin(ang)*rad,
-          sc.z-0.05           // slightly behind center so center (renderOrder 12) stays on top
+          _screenCtr.x+Math.cos(ang)*rad,
+          _screenCtr.y+Math.sin(ang)*rad,
+          _screenCtr.z-0.05
         );
         mesh.position.lerp(_clusterTgt, Math.min(delta*5,1));
       } else {
@@ -318,7 +318,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       }
       mesh.scale.setScalar(scales.current[i]);
       // unique fractional renderOrder per tier — fixes depthTest:false flicker; inactive=9 not 8 (avoids glow mesh at 8)
-      mesh.renderOrder = iAmHov ? 12 : iAmSel ? 11 : iAmTi ? (9 + i/N) : 9;
+      mesh.renderOrder = iAmHov ? 12 : iAmSel ? 11 : iAmTi ? (9 + i/N) : (6 + i/N);
 
       // ── Billboard: face camera (world-space mesh, no parent transform)
       mesh.quaternion.copy(camera.quaternion);
@@ -378,6 +378,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
   const handleOver=(i:number)=>(e:{stopPropagation:()=>void})=>{
     e.stopPropagation();
     if(debounceRef.current) clearTimeout(debounceRef.current);
+    const _hd=globalHoverRef.current>=0&&globalHoverRef.current!==i?250:80;
     debounceRef.current=setTimeout(()=>{
       if(globalHoverRef.current===i) return;
       globalHoverRef.current=i;
@@ -385,7 +386,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       rotZs.current[i]=(Math.random()>0.5?1:-1)*(0.08+Math.random()*0.11);
       onHoverChange(i);
       document.body.style.cursor='pointer';
-    },80);
+    },_hd);
   };
   // v8: handleOut checks which photo fired — hit sphere stays on globe so only genuine
   // mouse-exit fires this. 80ms debounce guards against micro-jitter between spheres.
