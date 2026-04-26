@@ -266,7 +266,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       // ── Scale target
       const iAmTi=tiSet.has(i);
       let tSc:number;
-      // v8: all clustered photos SAME SIZE — center = cluster = 0.18
+      // v8.1: scale parity confirmed — center=ring=0.26, glow=1.04x, opacity≤0.40
       if(iAmHov||iAmSel||iAmTi) tSc=0.26;
       else if(iAmConn) tSc=0.14;
       else if(anyActive) tSc=0.06;
