@@ -6,7 +6,6 @@ import LogoSpin from '@/components/LogoSpin';
 
 const NAV_LINKS = [
   { href: '/gallery', label: 'Gallery' },
-  { href: '/photos',  label: 'Photos'  },
   { href: '/videos',  label: 'Videos'  },
   { href: '/about',   label: 'About'   },
   { href: '/builds',  label: 'Builds'  },
