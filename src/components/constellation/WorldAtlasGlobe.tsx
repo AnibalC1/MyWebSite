@@ -44,8 +44,11 @@ function arcPts(a:[number,number],b:[number,number],elev=0.55,steps=72){
   const v0=ll2v(a[0],a[1]),v1=ll2v(b[0],b[1]);
   return new THREE.QuadraticBezierCurve3(v0,v0.clone().add(v1).normalize().multiplyScalar(R+elev),v1).getPoints(steps);
 }
-function arcPtsFromVec(v0:THREE.Vector3,v1:THREE.Vector3,elev=0.45,steps=32){
-  const mid=v0.clone().add(v1).normalize().multiplyScalar(R+elev);
+function arcPtsFromVec(v0:THREE.Vector3,v1:THREE.Vector3,steps=24){
+  // Midpoint sits above the higher endpoint so the arc never dips through the globe.
+  const r0=v0.length(), r1=v1.length();
+  const lift=Math.max(r0,r1)-R+0.30;
+  const mid=v0.clone().add(v1).normalize().multiplyScalar(R+lift);
   return new THREE.QuadraticBezierCurve3(v0.clone(),mid,v1.clone()).getPoints(steps);
 }
 function monthKey(ts:number){const d=new Date(ts*1000);return `${d.getUTCFullYear()}-${d.getUTCMonth()}`;}
@@ -137,31 +140,31 @@ interface HoloProps{
   onDoubleClick:(i:number)=>void;
 }
 
-const ARC_STEPS = 32;
+const ARC_STEPS = 24;
+const POOL = Math.max(MAX_MATES, 8);
 
 function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChange,onSingleClick,onDoubleClick}:HoloProps){
-  // visRefs = visual photo plane (raycast disabled), hitRefs = invisible static hit sphere on globe
   const visRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
   const hitRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
   const matRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(PHOTOS.map(()=>null));
-  // borderRefs = pool of glow border planes (one per photo, only month-mates show)
-  const borderRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
-  const borderMatRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(PHOTOS.map(()=>null));
+  // Pool of glow borders — much smaller than N. Each slot is bound to a specific photo while linked.
+  const borderRefs    =useRef<(THREE.Mesh|null)[]>(Array(POOL).fill(null));
+  const borderMatRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(Array(POOL).fill(null));
+  const borderPhotoMap=useRef<number[]>([]); // li -> photoIdx
+  const borderOpacs   =useRef(new Float32Array(POOL).fill(0));
 
   // Gold glow plane behind hovered photo
   const glowMat =useMemo(()=>new THREE.MeshBasicMaterial({color:'#c9a84c',transparent:true,opacity:0,depthTest:false}),[]);
-  const glowMesh=useMemo(()=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1.333,1.0),glowMat);m.renderOrder=8;return m;},[glowMat]);
+  const glowMesh=useMemo(()=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1.333,1.0),glowMat);m.renderOrder=8;m.visible=false;return m;},[glowMat]);
 
   // Per-photo animation state
-  const scales      =useRef(new Float32Array(N).fill(0.12));
-  const opacs       =useRef(new Float32Array(N).fill(0.48));
-  const rotYs       =useRef(new Float32Array(N).fill(0));
-  const rotZs       =useRef(new Float32Array(N).fill(0));
-  const tintTs      =useRef(new Float32Array(N).fill(0));
-  const borderOpacs =useRef(new Float32Array(N).fill(0));
-  const bobs        =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
+  const scales =useRef(new Float32Array(N).fill(0.12));
+  const opacs  =useRef(new Float32Array(N).fill(0.48));
+  const rotYs  =useRef(new Float32Array(N).fill(0));
+  const rotZs  =useRef(new Float32Array(N).fill(0));
+  const tintTs =useRef(new Float32Array(N).fill(0));
+  const bobs   =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
 
-  // Linked-mode tracking
   const prevLinkedRef = useRef(-1);
   const matesSetRef   = useRef(new Set<number>());
 
@@ -172,52 +175,76 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
     next();
   },[]);
 
-  // Arc line pool — sized to largest possible month bucket
-  const POOL = Math.max(MAX_MATES, 8);
-  const aArrs = useMemo(()=>Array.from({length:POOL},()=>new Float32Array((ARC_STEPS+1)*3)),[POOL]);
-  const aGeos = useMemo(()=>aArrs.map(arr=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(arr,3));g.setDrawRange(0, ARC_STEPS+1);return g;}),[aArrs]);
-  const aMats = useMemo(()=>Array.from({length:POOL},()=>new THREE.LineBasicMaterial({color:'#ffd66b',transparent:true,opacity:0,depthTest:false,blending:THREE.AdditiveBlending})),[POOL]);
-  const aLines = useMemo(()=>aGeos.map((g,i)=>{const l=new THREE.Line(g,aMats[i]); l.renderOrder=7; l.frustumCulled=false; return l;}),[aGeos,aMats]);
-
-  // Base-space arc points (recomputed only when linkedIdx changes)
-  const aBasePts = useRef<THREE.Vector3[][]>(Array.from({length:POOL},()=>[]));
+  // Arc line pool — geometry written ONCE per link change (globe is paused while linked,
+  // so points stay correct without per-frame re-transformation).
+  const aArrs  = useMemo(()=>Array.from({length:POOL},()=>new Float32Array((ARC_STEPS+1)*3)),[]);
+  const aGeos  = useMemo(()=>aArrs.map(arr=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(arr,3));return g;}),[aArrs]);
+  const aMats  = useMemo(()=>Array.from({length:POOL},()=>new THREE.LineBasicMaterial({color:'#ffd66b',transparent:true,opacity:0,depthTest:false,blending:THREE.AdditiveBlending})),[]);
+  const aLines = useMemo(()=>aGeos.map((g,i)=>{const l=new THREE.Line(g,aMats[i]); l.renderOrder=7; l.frustumCulled=false; l.visible=false; return l;}),[aGeos,aMats]);
   const aActiveCount = useRef(0);
 
-  // Pin line — shows where the linked photo's globe position is
+  // Pin line — linked photo's globe position
   const pinMat=useMemo(()=>new THREE.LineBasicMaterial({color:'#ffd66b',transparent:true,opacity:0,depthTest:false}),[]);
   const pinArr=useMemo(()=>new Float32Array(6),[]);
   const pinGeo=useMemo(()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pinArr,3));return g;},[pinArr]);
-  const pinLine=useMemo(()=>new THREE.Line(pinGeo,pinMat),[pinGeo,pinMat]);
+  const pinLine=useMemo(()=>{const l=new THREE.Line(pinGeo,pinMat);l.visible=false;return l;},[pinGeo,pinMat]);
 
   useFrame(({camera},delta) => {
     const h=globalHoverRef.current, s=globalLinkedRef.current;
     const anyHov=h>=0, anyLink=s>=0;
     _screenCtr.set(0,0,-3.5).applyMatrix4(camera.matrixWorld);
 
-    // ── Recompute month-mate set & arc base points when linked changes
-    if(s !== prevLinkedRef.current){
-      prevLinkedRef.current = s;
-      matesSetRef.current.clear();
-      aActiveCount.current = 0;
-      if(s >= 0){
-        const mates = MONTH_MATES[s];
-        const limit = Math.min(mates.length, POOL);
-        const v0 = PPOS[s].base;
-        for(let li=0; li<limit; li++){
-          const j = mates[li];
-          matesSetRef.current.add(j);
-          aBasePts.current[li] = arcPtsFromVec(v0, PPOS[j].base, 0.45, ARC_STEPS);
-        }
-        aActiveCount.current = limit;
-      }
-    }
-
-    const matesSet = matesSetRef.current;
-
     // Globe world quaternion
     if(globeRef.current) globeRef.current.getWorldQuaternion(_gQ);
     else _gQ.identity();
 
+    // ── Recompute arcs, borders, pin geometry ONCE when link changes.
+    // Globe is paused while linked (hover always paused), so world points stay valid.
+    if(s !== prevLinkedRef.current){
+      prevLinkedRef.current = s;
+      matesSetRef.current.clear();
+      borderPhotoMap.current = [];
+      if(s >= 0){
+        const mates = MONTH_MATES[s];
+        const limit = Math.min(mates.length, POOL);
+        const v0w = PPOS[s].base.clone().applyQuaternion(_gQ);
+        for(let li=0; li<limit; li++){
+          const j = mates[li];
+          matesSetRef.current.add(j);
+          borderPhotoMap.current.push(j);
+          const v1w = PPOS[j].base.clone().applyQuaternion(_gQ);
+          const pts = arcPtsFromVec(v0w, v1w, ARC_STEPS);
+          const arr = aArrs[li];
+          for(let k=0; k<pts.length; k++){
+            arr[k*3]=pts[k].x; arr[k*3+1]=pts[k].y; arr[k*3+2]=pts[k].z;
+          }
+          aGeos[li].attributes.position.needsUpdate = true;
+          aLines[li].visible = true;
+        }
+        for(let li=limit; li<POOL; li++){
+          aLines[li].visible = false;
+          aMats[li].opacity = 0;
+        }
+        aActiveCount.current = limit;
+        // Pin line geometry — also static while linked.
+        _wPos.copy(PPOS[s].base).applyQuaternion(_gQ);
+        _wSurf.copy(PPOS[s].surf).applyQuaternion(_gQ);
+        pinArr[0]=_wPos.x;pinArr[1]=_wPos.y;pinArr[2]=_wPos.z;
+        pinArr[3]=_wSurf.x;pinArr[4]=_wSurf.y;pinArr[5]=_wSurf.z;
+        pinGeo.attributes.position.needsUpdate=true;
+        pinLine.visible = true;
+      } else {
+        aActiveCount.current = 0;
+        for(let li=0; li<POOL; li++){
+          aLines[li].visible = false;
+          aMats[li].opacity = 0;
+        }
+        pinLine.visible = false;
+        pinMat.opacity = 0;
+      }
+    }
+
+    const matesSet = matesSetRef.current;
     const t=performance.now()/1000;
 
     // Hit spheres track globe rotation (invisible static hit targets)
@@ -233,10 +260,9 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       const iAmHov  = i===h;
       const iAmLink = i===s;
       const isMate  = matesSet.has(i);
-      const isPrimary = iAmHov; // centered photo
+      const isPrimary = iAmHov;
       const isEmphasized = iAmLink || isMate;
 
-      // ── Scale target — only the hovered photo flies to center
       let tSc:number;
       if(isPrimary)            tSc = 0.26;
       else if(isEmphasized)    tSc = 0.13;
@@ -244,15 +270,12 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       else                     tSc = 0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
-      // ── Opacity target
       const tOp = isPrimary ? 1.0 : isEmphasized ? 0.95 : (anyHov||anyLink) ? 0.05 : 0.48;
       opacs.current[i]+=(tOp-opacs.current[i])*Math.min(delta*9,1);
 
-      // ── Tint (0=cyan holographic, 1=full color)
       const tTint = (isPrimary||isEmphasized) ? 1 : 0;
       tintTs.current[i]+=(tTint-tintTs.current[i])*Math.min(delta*9,1);
 
-      // ── Cinematic rotation — spring back to 0
       if(iAmHov){
         rotYs.current[i]+=(0-rotYs.current[i])*Math.min(delta*4.5,1);
         rotZs.current[i]+=(0-rotZs.current[i])*Math.min(delta*7.0,1);
@@ -260,16 +283,12 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
         rotYs.current[i]=0; rotZs.current[i]=0;
       }
 
-      // ── World position = base position rotated by globe
       _wPos.copy(PPOS[i].base).applyQuaternion(_gQ);
-
-      // Bob only when nothing active
       if(!anyHov && !anyLink){
         bobs.current[i]+=delta*0.55;
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      // ── Position: hovered → screen center; everything else → globe surface
       if(isPrimary){
         mesh.position.lerp(_screenCtr, Math.min(delta*12,1));
       } else {
@@ -278,7 +297,6 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       mesh.scale.setScalar(scales.current[i]);
       mesh.renderOrder = iAmHov ? 12 : isEmphasized ? (10 + i/N) : (6 + i/N);
 
-      // Billboard
       mesh.quaternion.copy(camera.quaternion);
       if(rotYs.current[i]!==0 || rotZs.current[i]!==0){
         _euler.set(rotZs.current[i], rotYs.current[i], 0, 'YXZ');
@@ -289,27 +307,35 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       mat.opacity = opacs.current[i];
       _col.copy(_tintCol).lerp(_clearCol, tintTs.current[i]);
       mat.color.copy(_col);
+    }
 
-      // ── Glow border (month-mates only) — pulses to indicate luminating link
-      const border = borderRefs.current[i];
-      const bMat = borderMatRefs.current[i];
-      if(border && bMat){
-        const tBorder = isMate ? (0.55 + 0.30*Math.sin(t*2.8 + i*0.4)) : 0;
-        borderOpacs.current[i] += (tBorder - borderOpacs.current[i]) * Math.min(delta*6, 1);
-        bMat.opacity = borderOpacs.current[i];
-        if(borderOpacs.current[i] > 0.01){
+    // ── Borders track their bound photos (pool, not per-photo)
+    const active = aActiveCount.current;
+    for(let li=0; li<POOL; li++){
+      const border = borderRefs.current[li];
+      const bMat = borderMatRefs.current[li];
+      if(!border || !bMat) continue;
+      if(li < active){
+        const j = borderPhotoMap.current[li];
+        const pMesh = visRefs.current[j];
+        if(pMesh){
+          const tBorder = 0.55 + 0.30*Math.sin(t*2.8 + li*0.4);
+          borderOpacs.current[li] += (tBorder - borderOpacs.current[li]) * Math.min(delta*6, 1);
+          bMat.opacity = borderOpacs.current[li];
           border.visible = true;
-          border.position.copy(mesh.position);
-          border.quaternion.copy(mesh.quaternion);
-          border.scale.copy(mesh.scale).multiplyScalar(1.22);
-          border.renderOrder = mesh.renderOrder - 0.5;
-        } else {
-          border.visible = false;
+          border.position.copy(pMesh.position);
+          border.quaternion.copy(pMesh.quaternion);
+          border.scale.copy(pMesh.scale).multiplyScalar(1.22);
+          border.renderOrder = pMesh.renderOrder - 0.5;
         }
+      } else if(borderOpacs.current[li] > 0.01){
+        borderOpacs.current[li] += (0 - borderOpacs.current[li]) * 0.20;
+        bMat.opacity = borderOpacs.current[li];
+        if(borderOpacs.current[li] < 0.01){ border.visible = false; bMat.opacity = 0; }
       }
     }
 
-    // ── Gold glow behind primary (hovered) photo
+    // ── Gold glow behind hovered photo
     const glowTarget = h>=0 ? visRefs.current[h] : null;
     if(glowTarget){
       glowMesh.visible=true;
@@ -317,38 +343,21 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       glowMesh.quaternion.copy(camera.quaternion);
       glowMat.opacity = 0.30 + 0.10*Math.sin(t*2.2);
       glowMesh.scale.setScalar(scales.current[h]);
-    } else {
+    } else if(glowMat.opacity > 0.01) {
       glowMat.opacity += (0 - glowMat.opacity) * 0.18;
-      if(glowMat.opacity < 0.01) glowMesh.visible = false;
+      if(glowMat.opacity < 0.01){ glowMesh.visible = false; glowMat.opacity = 0; }
     }
 
-    // ── Luminating arcs — from linked photo to each month-mate
-    const active = aActiveCount.current;
-    for(let li=0; li<POOL; li++){
-      if(li < active){
-        const pts = aBasePts.current[li];
-        const arr = aArrs[li];
-        for(let k=0; k<pts.length; k++){
-          _wPos.copy(pts[k]).applyQuaternion(_gQ);
-          arr[k*3]=_wPos.x; arr[k*3+1]=_wPos.y; arr[k*3+2]=_wPos.z;
-        }
-        aGeos[li].attributes.position.needsUpdate = true;
-        const target = 0.55 + 0.30*Math.sin(t*3.4 + li*0.35);
-        aMats[li].opacity += (target - aMats[li].opacity) * 0.18;
-      } else if(aMats[li].opacity > 0.01){
-        aMats[li].opacity += (0 - aMats[li].opacity) * 0.20;
-      }
+    // ── Arc opacity pulse (geometry already set on link change)
+    for(let li=0; li<active; li++){
+      const target = 0.55 + 0.30*Math.sin(t*3.4 + li*0.35);
+      aMats[li].opacity += (target - aMats[li].opacity) * 0.18;
     }
 
-    // ── Pin line (linked photo → globe surface)
+    // ── Pin pulse
     if(anyLink){
-      _wPos.copy(PPOS[s].base).applyQuaternion(_gQ);
-      _wSurf.copy(PPOS[s].surf).applyQuaternion(_gQ);
-      pinArr[0]=_wPos.x;pinArr[1]=_wPos.y;pinArr[2]=_wPos.z;
-      pinArr[3]=_wSurf.x;pinArr[4]=_wSurf.y;pinArr[5]=_wSurf.z;
-      pinGeo.attributes.position.needsUpdate=true;
       pinMat.opacity = 0.30 + 0.30*Math.sin(t*3.5);
-    } else { pinMat.opacity += (0 - pinMat.opacity) * 0.18; }
+    }
   });
 
   // ── Pointer handlers ────────────────────────────────────────────────────────
@@ -396,18 +405,18 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
 
   return(
     <group>
-      {/* Glow border planes — one per photo, hidden unless month-mate */}
-      {PHOTOS.map((_,i)=>(
-        <mesh key={`bd-${i}`}
+      {/* Glow border pool — assigned to month-mates while linked */}
+      {Array.from({length:POOL}).map((_,li)=>(
+        <mesh key={`bd-${li}`}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ref={(el:any)=>{borderRefs.current[i]=el;}}
+          ref={(el:any)=>{borderRefs.current[li]=el;}}
           geometry={SHARED_BORDER_GEO}
           visible={false}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           raycast={()=>{}}
         >
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          <meshBasicMaterial ref={(el:any)=>{borderMatRefs.current[i]=el;}} color="#ffd66b" transparent opacity={0} side={THREE.DoubleSide} depthTest={false} blending={THREE.AdditiveBlending}/>
+          <meshBasicMaterial ref={(el:any)=>{borderMatRefs.current[li]=el;}} color="#ffd66b" transparent opacity={0} side={THREE.DoubleSide} depthTest={false} blending={THREE.AdditiveBlending}/>
         </mesh>
       ))}
       {/* Visual photo planes — raycast disabled */}
