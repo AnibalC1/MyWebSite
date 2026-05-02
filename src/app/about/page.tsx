@@ -5,7 +5,7 @@ import { motion, useInView } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import Navigation from '@/components/layout/Navigation'
-import Footer from '@/components/Footer'
+import Footer from '@/components/layout/Footer'
 
 function Reveal({
   children,
@@ -82,6 +82,56 @@ export default function AboutPage() {
             </h1>
           </motion.div>
         </div>
+      </div>
+
+
+      {/* Stats */}
+      <div className="max-w-[1280px] mx-auto px-6 py-24">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-12">
+          <Reveal>
+            <div className="flex flex-col gap-3">
+              <span className="font-light tracking-[-0.03em]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--gold)" }}>
+                2
+              </span>
+              <span className="text-[0.7rem] uppercase tracking-[0.2em]" style={{ color: "var(--warm-white)", fontFamily: "var(--font-body)" }}>
+                Children
+              </span>
+              <p className="text-sm leading-relaxed max-w-[32ch]" style={{ color: "var(--warm-white-muted)", fontFamily: "var(--font-body)" }}>
+                The standard by which every decision is measured.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <div className="flex flex-col gap-3">
+              <span className="font-light tracking-[-0.03em]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--gold)" }}>
+                8+
+              </span>
+              <span className="text-[0.7rem] uppercase tracking-[0.2em]" style={{ color: "var(--warm-white)", fontFamily: "var(--font-body)" }}>
+                Years on the Mat
+              </span>
+              <p className="text-sm leading-relaxed max-w-[32ch]" style={{ color: "var(--warm-white-muted)", fontFamily: "var(--font-body)" }}>
+                Brazilian Jiu-Jitsu is the honesty filter.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={0.2}>
+            <div className="flex flex-col gap-3">
+              <span className="font-light tracking-[-0.03em]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--gold)" }}>
+                3
+              </span>
+              <span className="text-[0.7rem] uppercase tracking-[0.2em]" style={{ color: "var(--warm-white)", fontFamily: "var(--font-body)" }}>
+                Systems Live
+              </span>
+              <p className="text-sm leading-relaxed max-w-[32ch]" style={{ color: "var(--warm-white-muted)", fontFamily: "var(--font-body)" }}>
+                Production systems running 24/7 on-chain.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </div>
+
+      <div className="max-w-[860px] mx-auto px-6">
+        <div style={{ height: "1px", background: "rgba(201,168,76,0.1)" }} />
       </div>
 
       {/* Prose */}

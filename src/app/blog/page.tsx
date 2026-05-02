@@ -4,7 +4,7 @@ import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import Navigation from '@/components/layout/Navigation'
 import Link from 'next/link'
-import Footer from '@/components/Footer'
+import Footer from '@/components/layout/Footer'
 
 function Reveal({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const ref = useRef(null)

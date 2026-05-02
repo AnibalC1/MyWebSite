@@ -24,7 +24,7 @@ function Reveal({ children, className = '', delay = 0 }: { children: React.React
 
 const STATS = [
   { value: '8+', label: 'Years Training', desc: 'Consistent mat time across multiple academies' },
-  { value: '4×', label: 'Per Week', desc: 'Minimum training frequency, injuries notwithstanding' },
+  { value: '4x', label: 'Per Week', desc: 'Minimum training frequency, injuries notwithstanding' },
   { value: '∞', label: 'Lessons Learned', desc: 'Every roll is a diagnostic. Every tap is data.' },
 ]
 

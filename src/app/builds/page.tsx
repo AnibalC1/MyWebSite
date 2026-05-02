@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import Navigation from '@/components/layout/Navigation'
-import Footer from '@/components/Footer'
+import Footer from '@/components/layout/Footer'
 
 const BUILDS = [
   {
@@ -16,6 +16,8 @@ const BUILDS = [
     tags: ['DeFi', 'Solidity', 'Node.js', 'Arbitrum'],
     description: 'Automated liquidation system monitoring health factors across Aave V3 positions. Executes flash-loan liquidations with sub-block latency.',
     stack: ['Solidity', 'Node.js', 'Redpanda', 'Docker', 'Arbitrum One'],
+    repoUrl: 'https://github.com/AnibalC1',
+    demoUrl: null,
   },
   {
     id: 'relational-memory-system',
@@ -26,6 +28,8 @@ const BUILDS = [
     tags: ['AI', 'NLP', 'PostgreSQL', 'Claude'],
     description: 'Context-aware memory layer built on top of Claude. Distills, indexes, and retrieves personal and operational knowledge across long-running agent sessions.',
     stack: ['Claude API', 'PostgreSQL', 'Node.js', 'Vector Embeddings'],
+    repoUrl: 'https://github.com/AnibalC1',
+    demoUrl: null,
   },
   {
     id: 'path-bridge',
@@ -36,6 +40,8 @@ const BUILDS = [
     tags: ['DeFi', 'MEV', 'Node.js', 'Kafka'],
     description: 'High-frequency path validation service sitting between quote aggregation and execution. Filters phantom arb paths before capital hits the chain.',
     stack: ['Node.js', 'Redpanda/Kafka', 'Alchemy RPC', 'Docker'],
+    repoUrl: 'https://github.com/AnibalC1',
+    demoUrl: null,
   },
 ]
 
@@ -126,6 +132,34 @@ export default function BuildsPage() {
               <p className="text-sm leading-relaxed max-w-[60ch]" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
                 {build.description}
               </p>
+              <div className="flex gap-4 mt-4">
+                {build.repoUrl && (
+                  <a
+                    href={build.repoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[0.65rem] uppercase tracking-[0.15em] transition-colors duration-200"
+                    style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)', textDecoration: 'none' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--gold)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--warm-white-muted)')}
+                  >
+                    View on GitHub ↗
+                  </a>
+                )}
+                {build.demoUrl && (
+                  <a
+                    href={build.demoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[0.65rem] uppercase tracking-[0.15em] transition-colors duration-200"
+                    style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)', textDecoration: 'none' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--gold)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--warm-white-muted)')}
+                  >
+                    Live Demo ↗
+                  </a>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-1 content-start pt-1">
