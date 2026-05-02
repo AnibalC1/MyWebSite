@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Navigation from '@/components/layout/Navigation'
+import Footer from '@/components/Footer'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', message: '', _hp: '' })
@@ -131,6 +132,7 @@ export default function ContactPage() {
           )}
         </motion.div>
       </div>
+      <Footer />
     </main>
   )
 }

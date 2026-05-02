@@ -5,6 +5,7 @@ import { motion, useInView } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
 import Navigation from '@/components/layout/Navigation'
+import Footer from '@/components/Footer'
 
 function Reveal({
   children,
@@ -263,6 +264,7 @@ export default function AboutPage() {
           </div>
         </Reveal>
       </div>
+      <Footer />
     </main>
   )
 }
