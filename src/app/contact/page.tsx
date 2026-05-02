@@ -109,7 +109,14 @@ export default function ContactPage() {
 
               {state === 'error' && (
                 <p className="text-sm" style={{ color: '#c97e7e', fontFamily: 'var(--font-body)' }}>
-                  Something went wrong. Try again or email directly.
+                  Something went wrong. Try again or{' '}
+                  <a
+                    href="mailto:anibal.cabral.ac@gmail.com"
+                    className="underline hover:opacity-80 transition-opacity"
+                    style={{ color: '#c97e7e' }}
+                  >
+                    email directly
+                  </a>.
                 </p>
               )}
 
@@ -166,6 +173,31 @@ export default function ContactPage() {
               </a>
             ))}
           </div>
+        </div>
+
+        {/* Direct email */}
+        <div className="mt-16 pt-12" style={{ borderTop: '1px solid rgba(201,168,76,0.1)' }}>
+          <p
+            className="text-[0.6rem] uppercase tracking-[0.2em] mb-4"
+            style={{ color: 'var(--gold-subtle)', fontFamily: 'var(--font-body)' }}
+          >
+            Or write directly
+          </p>
+          <a
+            href="mailto:anibal.cabral.ac@gmail.com"
+            className="text-base transition-colors duration-200"
+            style={{
+              color: 'var(--warm-white-muted)',
+              fontFamily: 'var(--font-body)',
+              textDecoration: 'none',
+              letterSpacing: '0.02em',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--gold)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--warm-white-muted)')}
+          >
+            anibal.cabral.ac@gmail.com
+            <span className="ml-2" style={{ fontSize: '0.85rem', opacity: 0.5 }}>↗</span>
+          </a>
         </div>
       </div>
       <Footer />
