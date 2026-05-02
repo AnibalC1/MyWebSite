@@ -6,12 +6,11 @@ import LogoSpin from '@/components/LogoSpin';
 
 const NAV_LINKS = [
   { href: '/gallery', label: 'Gallery' },
-  { href: '/videos', label: 'Videos' },
-  { href: '/memory-atlas', label: 'Atlas' },
-  { href: '/about', label: 'About' },
-  { href: '/builds', label: 'Builds' },
+  { href: '/videos',  label: 'Videos'  },
+  { href: '/about',   label: 'About'   },
+  { href: '/blog',    label: 'Blog'    },
   { href: '/fitness', label: 'Fitness' },
-  { href: '/blog', label: 'Blog' },
+  { href: '/builds',  label: 'Builds'  },
   { href: '/contact', label: 'Contact' },
 ];
 
@@ -41,16 +40,15 @@ export default function Navigation() {
       }}>
         <LogoSpin height={120} />
 
-        {/* Desktop links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2.0rem' }} className=desktop-nav>
+        <div className="nav-desktop" style={{ display: 'flex', alignItems: 'center', gap: '2.4rem' }}>
           {NAV_LINKS.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
               style={{
                 fontFamily: 'Inter, sans-serif',
-                fontSize: '0.65rem',
-                letterSpacing: '0.2em',
+                fontSize: '0.68rem',
+                letterSpacing: '0.22em',
                 color: 'rgba(255,255,255,0.45)',
                 textDecoration: 'none',
                 textTransform: 'uppercase',
@@ -64,17 +62,16 @@ export default function Navigation() {
           ))}
         </div>
 
-        {/* Mobile hamburger */}
         <button
           onClick={() => setMenuOpen(o => !o)}
-          aria-label=Toggle menu
+          aria-label="Toggle menu"
+          className="mobile-menu-btn"
           style={{
             display: 'none',
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '4px',
             color: 'rgba(255,255,255,0.6)',
           }}
-          className=mobile-menu-btn
         >
           <div style={{ width: '22px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
             <span style={{ height: '1px', background: 'currentColor', display: 'block', transition: 'all 0.3s', transform: menuOpen ? 'rotate(45deg) translateY(6px)' : 'none' }} />

@@ -18,34 +18,34 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: 'Anibal Cabral — Systems Builder, Father, Martial Artist',
-    template: '%s | Anibal Cabral',
-  },
-  description: 'Systems builder. Father. BJJ practitioner. Entrepreneur. Building things that matter — one discipline at a time.',
-  keywords: ['systems', 'BJJ', 'entrepreneur', 'builder', 'discipline', 'Anibal Cabral'],
+  title: 'Anibal Cabral — Systems Builder, Father, BJJ Practitioner',
+  description: 'Anibal Cabral builds systems that scale. Father of two. Brazilian Jiu-Jitsu practitioner. Entrepreneur. Writing about engineering, leadership, and living deliberately.',
+  keywords: ['Anibal Cabral', 'systems builder', 'BJJ', 'entrepreneur', 'software engineer', 'leadership', 'Brazilian Jiu-Jitsu'],
   authors: [{ name: 'Anibal Cabral' }],
   creator: 'Anibal Cabral',
-  metadataBase: new URL('https://my-web-site-delta-three.vercel.app'),
+  metadataBase: new URL('https://anibalcabral.com'),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
-    title: 'Anibal Cabral',
-    description: 'Systems builder. Father. BJJ practitioner. Entrepreneur.',
+    title: 'Anibal Cabral — Systems Builder, Father, BJJ Practitioner',
+    description: 'Building systems that scale. Writing about engineering, leadership, and living deliberately.',
     type: 'website',
-    siteName: 'Anibal Cabral',
     locale: 'en_US',
-    images: [
-      {
-        url: '/logo.png',
-        width: 772,
-        height: 1340,
-        alt: 'Anibal Cabral',
-      },
-    ],
+    url: 'https://anibalcabral.com',
+    siteName: 'Anibal Cabral',
+    images: [{
+      url: '/og-image.jpg',
+      width: 1200,
+      height: 630,
+      alt: 'Anibal Cabral — Systems Builder',
+    }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Anibal Cabral',
-    description: 'Systems builder. Father. BJJ practitioner. Entrepreneur.',
+    title: 'Anibal Cabral — Systems Builder',
+    description: 'Building systems that scale. Father. BJJ practitioner. Entrepreneur.',
+    images: ['/og-image.jpg'],
     creator: '@anibalcabral',
   },
   robots: {
@@ -60,10 +60,7 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: 'google-site-verification-code',
-  },
-  alternates: {
-    canonical: 'https://my-web-site-delta-three.vercel.app',
+    google: 'YOUR_GOOGLE_VERIFICATION',
   },
 };
 
@@ -75,6 +72,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${inter.variable}`}>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -82,15 +81,13 @@ export default function RootLayout({
               '@context': 'https://schema.org',
               '@type': 'Person',
               name: 'Anibal Cabral',
-              description: 'Systems builder, father, and martial artist.',
-              url: 'https://my-web-site-delta-three.vercel.app',
+              url: 'https://anibalcabral.com',
               sameAs: [
                 'https://github.com/AnibalC1',
                 'https://linkedin.com/in/anibalcabral',
-                'https://twitter.com/anibalcabral',
               ],
               jobTitle: 'Systems Builder & Entrepreneur',
-              knowsAbout: ['Systems Engineering', 'BJJ', 'Entrepreneurship', 'Software Development'],
+              description: 'Building systems that scale. Father. BJJ practitioner.',
             }),
           }}
         />

@@ -1,24 +1,24 @@
-import { MetadataRoute } from 'next';
+import { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://my-web-site-delta-three.vercel.app';
-  
+  const baseUrl = 'https://anibalcabral.com'
+
   const routes = [
     '',
     '/about',
-    '/gallery',
-    '/videos',
-    '/memory-atlas',
-    '/builds',
-    '/fitness',
     '/blog',
+    '/builds',
     '/contact',
-  ];
+    '/fitness',
+    '/gallery',
+    '/memory-atlas',
+    '/videos',
+  ]
 
-  return routes.map(route => ({
+  return routes.map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
-    changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1.0 : 0.8,
-  }));
+    changeFrequency: route === '' || route === '/blog' ? 'weekly' : 'monthly',
+    priority: route === '' ? 1.0 : route === '/about' ? 0.9 : 0.7,
+  }))
 }

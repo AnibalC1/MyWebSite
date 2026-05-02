@@ -1,49 +1,14 @@
-'use client';
+'use client'
 
-import { useRef } from 'react';
-import { motion, useInView } from 'framer-motion';
-import Link from 'next/link';
-import Navigation from '@/components/layout/Navigation';
-import Footer from '@/components/layout/Footer';
-
-const POSTS = [
-  {
-    slug: 'systems-over-goals',
-    title: 'Systems Over Goals',
-    date: 'Apr 2026',
-    excerpt: 'Goals are for planning. Systems are for living. The difference is what separates people who dream from people who build.',
-    readTime: '6 min',
-    featured: true,
-  },
-  {
-    slug: 'what-bjj-taught-me',
-    title: 'What BJJ Taught Me About Systems',
-    date: 'Mar 2026',
-    excerpt: 'On the mat, you cannot fake competence. The same is true in business, in relationships, and in the systems you build.',
-    readTime: '8 min',
-    featured: false,
-  },
-  {
-    slug: 'raising-builders',
-    title: 'Raising Builders, Not Consumers',
-    date: 'Feb 2026',
-    excerpt: 'My children will inherit the systems I build. Not just the money I make. That changes how I think about everything.',
-    readTime: '5 min',
-    featured: false,
-  },
-  {
-    slug: 'the-cost-of-indecision',
-    title: 'The Cost of Indecision',
-    date: 'Jan 2026',
-    excerpt: 'Every day you wait is a day someone else moves. The gap between intention and action is where most people live.',
-    readTime: '4 min',
-    featured: false,
-  },
-];
+import { useRef } from 'react'
+import { motion, useInView } from 'framer-motion'
+import Navigation from '@/components/layout/Navigation'
+import Link from 'next/link'
+import Footer from '@/components/layout/Footer'
 
 function Reveal({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: '-80px' })
   return (
     <motion.div
       ref={ref}
@@ -54,97 +19,104 @@ function Reveal({ children, className = '', delay = 0 }: { children: React.React
     >
       {children}
     </motion.div>
-  );
+  )
 }
 
-export default function BlogPage() {
-  const featured = POSTS.find(p => p.featured);
-  const others = POSTS.filter(p => !p.featured);
+const POSTS = [
+  {
+    slug: 'systems-thinking',
+    title: 'Why Systems Thinking Is the Only Competitive Advantage Left',
+    date: '2026-04-15',
+    excerpt: 'In a world where everyone has access to the same tools, the differentiator is how you combine them. Systems thinking is the multiplier.',
+    tag: 'Strategy',
+    readTime: '6 min',
+  },
+  {
+    slug: 'bjj-startup',
+    title: 'What Brazilian Jiu-Jitsu Taught Me About Building Companies',
+    date: '2026-03-22',
+    excerpt: 'The mat is a laboratory for decision-making under pressure. Every choke is a lesson in resource allocation.',
+    tag: 'Leadership',
+    readTime: '8 min',
+  },
+  {
+    slug: 'ai-automation',
+    title: 'The 10x Engineer Is Dead. Long Live the 10x System.',
+    date: '2026-02-10',
+    excerpt: 'Stop hiring for heroics. Start architecting for leverage. The best engineers today are systems architects, not code monkeys.',
+    tag: 'Engineering',
+    readTime: '5 min',
+  },
+  {
+    slug: 'fatherhood-focus',
+    title: 'Fatherhood Forced Me to Become Ruthless With My Time',
+    date: '2026-01-05',
+    excerpt: 'Kids do not negotiate. They demand presence. And that demand became the filter that transformed every decision I make.',
+    tag: 'Life',
+    readTime: '4 min',
+  },
+]
 
+export default function BlogPage() {
   return (
     <main className="min-h-screen" style={{ background: 'var(--obsidian)' }}>
       <Navigation />
 
-      <div className="max-w-[1280px] mx-auto px-6 pt-40 pb-32">
+      <div className="max-w-[720px] mx-auto px-6 pt-40 pb-32">
         <Reveal>
-          <p className="text-[0.6875rem] tracking-[0.35em] uppercase mb-5" style={{ color: '#4a4845', fontFamily: 'var(--font-body)' }}>
-            Writing
+          <p className="text-[0.6875rem] tracking-[0.35em] uppercase mb-5" style={{ color: 'var(--gold-muted)', fontFamily: 'var(--font-body)' }}>
+            Blog
           </p>
           <h1
-            className="font-light leading-[0.9] tracking-[-0.03em] mb-6"
+            className="font-light leading-[0.9] tracking-[-0.03em] mb-8"
             style={{ fontFamily: 'var(--font-display)', color: 'var(--warm-white)', fontSize: 'clamp(3rem, 8vw, 6rem)' }}
           >
-            Thoughts on<br />Systems & Discipline
+            Essays on systems, leadership and craft
           </h1>
-          <p className="text-base max-w-[55ch] leading-relaxed mb-16" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
-            I write about what I am learning — not what I have mastered. These are working notes from someone building in public.
+          <p className="text-base leading-relaxed mb-20" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)', maxWidth: '480px' }}>
+            Writing forces clarity. These are the ideas that have survived the filter of execution.
           </p>
         </Reveal>
 
-        {featured && (
-          <Reveal className="mb-16">
-            <div
-              className="relative overflow-hidden transition-all duration-500"
-              style={{
-                border: '1px solid var(--steel)',
-                padding: '3rem',
-                background: 'linear-gradient(135deg, rgba(201,168,76,0.03) 0%, transparent 60%)',
-              }}
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <span
-                  className="text-[0.55rem] uppercase tracking-widest px-2 py-0.5"
-                  style={{ border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', fontFamily: 'var(--font-body)' }}
-                >
-                  Featured
-                </span>
-                <span className="text-xs" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
-                  {featured.date} · {featured.readTime} read
-                </span>
-              </div>
-              <h2
-                className="text-3xl font-light italic mb-4"
-                style={{ fontFamily: 'var(--font-display)', color: 'var(--warm-white)' }}
-              >
-                {featured.title}
-              </h2>
-              <p className="text-sm leading-relaxed max-w-[60ch]" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
-                {featured.excerpt}
-              </p>
-            </div>
-          </Reveal>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {others.map((post, i) => (
+        <div className="flex flex-col gap-0">
+          {POSTS.map((post, i) => (
             <Reveal key={post.slug} delay={i * 0.08}>
-              <div
-                className="h-full"
-                style={{
-                  border: '1px solid var(--steel)',
-                  padding: '2rem',
-                  background: 'var(--graphite)',
-                }}
+              <Link
+                href={`/blog/${post.slug}`}
+                className="group block py-10 border-t"
+                style={{ borderColor: 'rgba(201,168,76,0.1)' }}
               >
-                <span className="text-xs mb-4 block" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
-                  {post.date} · {post.readTime}
-                </span>
-                <h3
-                  className="text-xl font-light italic mb-3"
-                  style={{ fontFamily: 'var(--font-display)', color: 'var(--warm-white)' }}
+                <div className="flex items-center gap-4 mb-4">
+                  <span
+                    className="text-[0.6rem] uppercase tracking-[0.2em] px-3 py-1"
+                    style={{
+                      background: 'rgba(201,168,76,0.08)',
+                      color: 'var(--gold)',
+                      fontFamily: 'var(--font-body)',
+                      borderRadius: '2px',
+                    }}
+                  >
+                    {post.tag}
+                  </span>
+                  <span className="text-[0.65rem] tracking-[0.15em] uppercase" style={{ color: 'var(--steel)', fontFamily: 'var(--font-body)' }}>
+                    {post.date} {post.readTime}
+                  </span>
+                </div>
+                <h2
+                  className="font-light leading-[1.1] tracking-[-0.02em] mb-3 transition-colors duration-300 group-hover:text-[var(--gold)]"
+                  style={{ fontFamily: 'var(--font-display)', color: 'var(--warm-white)', fontSize: 'clamp(1.5rem, 3vw, 2.2rem)' }}
                 >
                   {post.title}
-                </h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
+                </h2>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)', maxWidth: '560px' }}>
                   {post.excerpt}
                 </p>
-              </div>
+              </Link>
             </Reveal>
           ))}
         </div>
       </div>
-
       <Footer />
     </main>
-  );
+  )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Navigation from '@/components/layout/Navigation'
+import Footer from '@/components/layout/Footer'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', message: '', _hp: '' })
@@ -130,7 +131,44 @@ export default function ContactPage() {
             </form>
           )}
         </motion.div>
+
+        {/* Social links */}
+        <div className="mt-24 pt-12" style={{ borderTop: '1px solid rgba(201,168,76,0.1)' }}>
+          <p
+            className="text-[0.6rem] uppercase tracking-[0.2em] mb-6"
+            style={{ color: 'var(--gold-subtle)', fontFamily: 'var(--font-body)' }}
+          >
+            Or find me here
+          </p>
+          <div className="flex flex-wrap gap-6">
+            {[
+              { label: 'GitHub', href: 'https://github.com/AnibalC1' },
+              { label: 'LinkedIn', href: 'https://linkedin.com/in/anibalcabral' },
+              { label: 'YouTube', href: 'https://youtube.com' },
+              { label: 'Instagram', href: 'https://instagram.com' },
+            ].map(({ label, href }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm transition-colors duration-200"
+                style={{
+                  color: 'var(--warm-white-muted)',
+                  fontFamily: 'var(--font-body)',
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--gold)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--warm-white-muted)')}
+              >
+                {label}
+                <span className="ml-1" style={{ fontSize: '0.75rem', opacity: 0.5 }}>↗</span>
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
+      <Footer />
     </main>
   )
 }

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Navigation from '@/components/layout/Navigation'
+import Footer from '@/components/layout/Footer'
 import { MemoryNode, NodeCategory, CATEGORY_COLORS, deriveConnections } from '@/lib/nodes'
 import rawNodes from '@/data/nodes.json'
 
@@ -322,6 +323,9 @@ export default function MemoryAtlasPage() {
           onSelect={setSelectedNode}
         />
       )}
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </main>
   )
 }
