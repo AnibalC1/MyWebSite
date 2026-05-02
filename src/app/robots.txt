@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://my-web-site-delta-three.vercel.app/sitemap.xml
