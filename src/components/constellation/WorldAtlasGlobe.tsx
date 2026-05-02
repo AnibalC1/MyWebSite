@@ -34,6 +34,10 @@ const SHARED_GEO = new THREE.PlaneGeometry(1.333, 1);
 SHARED_GEO.computeBoundingSphere();
 const SHARED_BORDER_GEO = new THREE.PlaneGeometry(1.333, 1);
 SHARED_BORDER_GEO.computeBoundingSphere();
+// Hit sphere geometry/material shared across all 500+ photos so we don't
+// instantiate hundreds of duplicates on mount.
+const SHARED_HIT_GEO = new THREE.SphereGeometry(0.07, 6, 6);
+const SHARED_HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
 
 // ─── Geo helpers ─────────────────────────────────────────────────────────────
 function ll2v(lat:number,lon:number,r=R){
@@ -168,18 +172,54 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
   const prevLinkedRef = useRef(-1);
   const matesSetRef   = useRef(new Set<number>());
 
-  // Texture loading — limited concurrency
+  // Texture loading — downscale via createImageBitmap so we don't ship
+  // 1.7 GB of full-res JPEGs to the GPU. Each thumbnail is ~128 px wide,
+  // sufficient for the floating planes (the centered hover card uses an
+  // <img> for full resolution).
   useEffect(()=>{
-    let idx=0,active=0;
-    const next=()=>{ while(idx<N&&active<20){const i=idx++;active++;new THREE.TextureLoader().load(PHOTOS[i].src,t=>{t.colorSpace=THREE.SRGBColorSpace;active--;if(matRefs.current[i]){matRefs.current[i]!.map=t;matRefs.current[i]!.needsUpdate=true;}next();},undefined,()=>{active--;next();});} };
+    let alive = true;
+    let idx=0, active=0;
+    const MAX_W = 128;
+    const supportsBitmap = typeof createImageBitmap === 'function';
+
+    const apply = (i:number, image: TexImageSource) => {
+      if(!alive) return;
+      const tex = new THREE.Texture(image as HTMLImageElement);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.generateMipmaps = false;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.needsUpdate = true;
+      const m = matRefs.current[i];
+      if(m){ m.map = tex; m.needsUpdate = true; }
+    };
+
+    const loadBitmap = (i:number) => fetch(PHOTOS[i].src)
+      .then(r => r.ok ? r.blob() : Promise.reject(new Error('404')))
+      .then(b => createImageBitmap(b, { resizeWidth: MAX_W, resizeQuality: 'medium' }))
+      .then(bm => apply(i, bm));
+
+    const loadFallback = (i:number) => new Promise<void>((res)=>{
+      new THREE.TextureLoader().load(PHOTOS[i].src, t => { apply(i, t.image); res(); }, undefined, ()=>res());
+    });
+
+    const next = () => {
+      while(idx<N && active<6 && alive){
+        const i = idx++; active++;
+        const p = supportsBitmap ? loadBitmap(i) : loadFallback(i);
+        p.catch(()=>{}).finally(()=>{ active--; if(alive) next(); });
+      }
+    };
     next();
+    return () => { alive = false; };
   },[]);
 
   // Arc line pool — geometry written ONCE per link change (globe is paused while linked,
   // so points stay correct without per-frame re-transformation).
   const aArrs  = useMemo(()=>Array.from({length:POOL},()=>new Float32Array((ARC_STEPS+1)*3)),[]);
   const aGeos  = useMemo(()=>aArrs.map(arr=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(arr,3));return g;}),[aArrs]);
-  const aMats  = useMemo(()=>Array.from({length:POOL},()=>new THREE.LineBasicMaterial({color:'#ffd66b',transparent:true,opacity:0,depthTest:false,blending:THREE.AdditiveBlending})),[]);
+  // Normal blending — additive saturated to white when 100+ arcs converged at one origin.
+  const aMats  = useMemo(()=>Array.from({length:POOL},()=>new THREE.LineBasicMaterial({color:'#ffd66b',transparent:true,opacity:0,depthTest:false})),[]);
   const aLines = useMemo(()=>aGeos.map((g,i)=>{const l=new THREE.Line(g,aMats[i]); l.renderOrder=7; l.frustumCulled=false; l.visible=false; return l;}),[aGeos,aMats]);
   const aActiveCount = useRef(0);
 
@@ -319,7 +359,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
         const j = borderPhotoMap.current[li];
         const pMesh = visRefs.current[j];
         if(pMesh){
-          const tBorder = 0.55 + 0.30*Math.sin(t*2.8 + li*0.4);
+          const tBorder = 0.40 + 0.18*Math.sin(t*2.4 + li*0.4);
           borderOpacs.current[li] += (tBorder - borderOpacs.current[li]) * Math.min(delta*6, 1);
           bMat.opacity = borderOpacs.current[li];
           border.visible = true;
@@ -350,7 +390,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
 
     // ── Arc opacity pulse (geometry already set on link change)
     for(let li=0; li<active; li++){
-      const target = 0.55 + 0.30*Math.sin(t*3.4 + li*0.35);
+      const target = 0.30 + 0.18*Math.sin(t*2.4 + li*0.35);
       aMats[li].opacity += (target - aMats[li].opacity) * 0.18;
     }
 
@@ -434,19 +474,18 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
           <meshBasicMaterial ref={(el:any)=>{matRefs.current[i]=el;}} color={_tintCol.clone()} transparent opacity={0.48} side={THREE.DoubleSide} depthTest={false}/>
         </mesh>
       ))}
-      {/* Invisible hit spheres — STATIC on globe, fire all pointer events */}
+      {/* Invisible hit spheres — shared geometry+material to avoid 500+ duplicates */}
       {PHOTOS.map((_,i)=>(
         <mesh key={`hit-${i}`}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ref={(el:any)=>{hitRefs.current[i]=el;}}
+          geometry={SHARED_HIT_GEO}
+          material={SHARED_HIT_MAT}
           position={PPOS[i].base}
           onPointerOver={handleOver(i)}
           onPointerOut={handleOut(i)}
           onClick={handleClick(i)}
-        >
-          <sphereGeometry args={[0.07,8,8]}/>
-          <meshBasicMaterial visible={false}/>
-        </mesh>
+        />
       ))}
       <primitive object={glowMesh}/>
       <primitive object={pinLine}/>
@@ -622,7 +661,7 @@ export default function WorldAtlasGlobe(){
     <div style={{position:'fixed',inset:0,background:'radial-gradient(ellipse at 40% 45%,#00091a 0%,#000000 75%)',opacity:ready?1:0,transition:'opacity 1.2s ease'}}>
       <div className="grain-overlay" aria-hidden/>
 
-      <Canvas camera={{position:[0,0,7],fov:48}} gl={{antialias:true,alpha:true}} style={{position:'absolute',inset:0,pointerEvents:'auto',cursor:'grab'}} dpr={[1,2]}>
+      <Canvas camera={{position:[0,0,7],fov:48}} gl={{antialias:true,alpha:true}} style={{position:'absolute',inset:0,pointerEvents:'auto',cursor:'grab'}} dpr={[1,1.5]}>
         <ambientLight intensity={0.15}/>
         <pointLight position={[10,10,10]}   intensity={0.4} color="#4488ff"/>
         <pointLight position={[-10,-5,-10]} intensity={0.2} color="#002244"/>
