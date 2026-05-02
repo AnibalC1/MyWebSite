@@ -135,23 +135,29 @@ function GlobeGroup({globeRef,pausedRef}:{globeRef:React.RefObject<THREE.Group|n
 }
 
 // ─── Floating Holograms — outside globe group for clean billboarding ──────────
+type LinkMode = 'none' | 'hover' | 'open' | 'fading';
+const HOLD_SEC = 2.0;  // glow holds at full strength after close
+const FADE_SEC = 1.5;  // then fades out over this duration
+
 interface HoloProps{
   globeRef:React.RefObject<THREE.Group|null>;
   globalHoverRef:React.MutableRefObject<number>;
-  globalLinkedRef:React.MutableRefObject<number>;
+  globalOpenRef:React.MutableRefObject<number>;
+  linkPivotRef:React.MutableRefObject<number>;
+  linkModeRef:React.MutableRefObject<LinkMode>;
+  fadeStartRef:React.MutableRefObject<number>;
   onHoverChange:(i:number)=>void;
-  onSingleClick:(i:number)=>void;
-  onDoubleClick:(i:number)=>void;
+  onClick:(i:number)=>void;
 }
 
 const ARC_STEPS = 24;
 const POOL = Math.max(MAX_MATES, 8);
 
-function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChange,onSingleClick,onDoubleClick}:HoloProps){
+function FloatingHolograms({globeRef,globalHoverRef,globalOpenRef,linkPivotRef,linkModeRef,fadeStartRef,onHoverChange,onClick}:HoloProps){
   const visRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
   const hitRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
   const matRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(PHOTOS.map(()=>null));
-  // Pool of glow borders — much smaller than N. Each slot is bound to a specific photo while linked.
+  // Pool of glow borders — much smaller than N. Each slot is bound to a month-mate while linked.
   const borderRefs    =useRef<(THREE.Mesh|null)[]>(Array(POOL).fill(null));
   const borderMatRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(Array(POOL).fill(null));
   const borderPhotoMap=useRef<number[]>([]); // li -> photoIdx
@@ -169,8 +175,11 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
   const tintTs =useRef(new Float32Array(N).fill(0));
   const bobs   =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
 
-  const prevLinkedRef = useRef(-1);
-  const matesSetRef   = useRef(new Set<number>());
+  const prevPivotRef = useRef(-1);
+  const matesSetRef  = useRef(new Set<number>());
+  // Base-space arc points per slot — transformed to world space each frame so
+  // arcs follow the globe even while it's spinning during the fade-out tail.
+  const aBasePts = useRef<THREE.Vector3[][]>(Array.from({length:POOL},()=>[]));
 
   // Texture loading — downscale via createImageBitmap so we don't ship
   // 1.7 GB of full-res JPEGs to the GPU. Each thumbnail is ~128 px wide,
@@ -214,8 +223,7 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
     return () => { alive = false; };
   },[]);
 
-  // Arc line pool — geometry written ONCE per link change (globe is paused while linked,
-  // so points stay correct without per-frame re-transformation).
+  // Arc line pool — geometry transformed each frame from cached base points.
   const aArrs  = useMemo(()=>Array.from({length:POOL},()=>new Float32Array((ARC_STEPS+1)*3)),[]);
   const aGeos  = useMemo(()=>aArrs.map(arr=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(arr,3));return g;}),[aArrs]);
   // Normal blending — additive saturated to white when 100+ arcs converged at one origin.
@@ -230,90 +238,93 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
   const pinLine=useMemo(()=>{const l=new THREE.Line(pinGeo,pinMat);l.visible=false;return l;},[pinGeo,pinMat]);
 
   useFrame(({camera},delta) => {
-    const h=globalHoverRef.current, s=globalLinkedRef.current;
-    const anyHov=h>=0, anyLink=s>=0;
+    const h = globalHoverRef.current;
+    const o = globalOpenRef.current;
     _screenCtr.set(0,0,-3.5).applyMatrix4(camera.matrixWorld);
+
+    // ── Resolve fade-end before reading mode.
+    let mode = linkModeRef.current;
+    if(mode === 'fading'){
+      const elapsed = (performance.now() - fadeStartRef.current) / 1000;
+      if(elapsed >= HOLD_SEC + FADE_SEC){
+        mode = 'none';
+        linkModeRef.current = 'none';
+        linkPivotRef.current = -1;
+        fadeStartRef.current = 0;
+      }
+    }
+
+    // ── Compute arc / border opacity multipliers from mode.
+    let arcF = 0, borderF = 0;
+    if(mode === 'hover'){ arcF = 1; }
+    else if(mode === 'open'){ arcF = 1; borderF = 1; }
+    else if(mode === 'fading'){
+      const elapsed = (performance.now() - fadeStartRef.current) / 1000;
+      if(elapsed < HOLD_SEC){ arcF = 1; borderF = 1; }
+      else {
+        const f = Math.max(0, 1 - (elapsed - HOLD_SEC) / FADE_SEC);
+        arcF = f; borderF = f;
+      }
+    }
+
+    const pivot = linkPivotRef.current;
+    const photoActive = h >= 0 || o >= 0;
 
     // Globe world quaternion
     if(globeRef.current) globeRef.current.getWorldQuaternion(_gQ);
     else _gQ.identity();
 
-    // ── Recompute arcs, borders, pin geometry ONCE when link changes.
-    // Globe is paused while linked (hover always paused), so world points stay valid.
-    if(s !== prevLinkedRef.current){
-      prevLinkedRef.current = s;
+    // ── On pivot change, snap old arcs/borders off and load new mates.
+    // Base-space arc points are cached and transformed each frame.
+    if(pivot !== prevPivotRef.current){
+      prevPivotRef.current = pivot;
       matesSetRef.current.clear();
       borderPhotoMap.current = [];
-      if(s >= 0){
-        const mates = MONTH_MATES[s];
+      // Snap previous to zero so old/new don't smoothly tween into each other.
+      for(let li=0; li<POOL; li++){
+        aMats[li].opacity = 0;
+        aLines[li].visible = false;
+        borderOpacs.current[li] = 0;
+        const bm = borderMatRefs.current[li]; if(bm) bm.opacity = 0;
+        const br = borderRefs.current[li];    if(br) br.visible = false;
+      }
+      if(pivot >= 0){
+        const mates = MONTH_MATES[pivot];
         const limit = Math.min(mates.length, POOL);
-        const v0w = PPOS[s].base.clone().applyQuaternion(_gQ);
         for(let li=0; li<limit; li++){
           const j = mates[li];
           matesSetRef.current.add(j);
           borderPhotoMap.current.push(j);
-          const v1w = PPOS[j].base.clone().applyQuaternion(_gQ);
-          const pts = arcPtsFromVec(v0w, v1w, ARC_STEPS);
-          const arr = aArrs[li];
-          for(let k=0; k<pts.length; k++){
-            arr[k*3]=pts[k].x; arr[k*3+1]=pts[k].y; arr[k*3+2]=pts[k].z;
-          }
-          aGeos[li].attributes.position.needsUpdate = true;
-          aLines[li].visible = true;
-        }
-        for(let li=limit; li<POOL; li++){
-          aLines[li].visible = false;
-          aMats[li].opacity = 0;
+          aBasePts.current[li] = arcPtsFromVec(PPOS[pivot].base, PPOS[j].base, ARC_STEPS);
         }
         aActiveCount.current = limit;
-        // Pin line geometry — also static while linked.
-        _wPos.copy(PPOS[s].base).applyQuaternion(_gQ);
-        _wSurf.copy(PPOS[s].surf).applyQuaternion(_gQ);
-        pinArr[0]=_wPos.x;pinArr[1]=_wPos.y;pinArr[2]=_wPos.z;
-        pinArr[3]=_wSurf.x;pinArr[4]=_wSurf.y;pinArr[5]=_wSurf.z;
-        pinGeo.attributes.position.needsUpdate=true;
-        pinLine.visible = true;
       } else {
         aActiveCount.current = 0;
-        for(let li=0; li<POOL; li++){
-          aLines[li].visible = false;
-          aMats[li].opacity = 0;
-        }
-        pinLine.visible = false;
-        pinMat.opacity = 0;
       }
     }
 
-    const matesSet = matesSetRef.current;
     const t=performance.now()/1000;
 
-    // Hit spheres track globe rotation (invisible static hit targets)
+    // Hit spheres track globe rotation
     for(let i=0;i<N;i++){
       const hit=hitRefs.current[i];
       if(hit){ _wPos.copy(PPOS[i].base).applyQuaternion(_gQ); hit.position.copy(_wPos); }
     }
 
+    // ── Per-photo: hovered → centered card, otherwise rest. No mate-emphasis
+    // on the photo itself — the glow is carried by arcs and borders.
     for(let i=0;i<N;i++){
       const mesh=visRefs.current[i];const mat=matRefs.current[i];
       if(!mesh||!mat)continue;
 
-      const iAmHov  = i===h;
-      const iAmLink = i===s;
-      const isMate  = matesSet.has(i);
-      const isPrimary = iAmHov;
-      const isEmphasized = iAmLink || isMate;
+      const iAmHov = (i === h) && (o < 0);
+      let tSc:number, tOp:number, tTint:number;
+      if(iAmHov)            { tSc = 0.26; tOp = 1.0;  tTint = 1; }
+      else if(photoActive)  { tSc = 0.06; tOp = 0.05; tTint = 0; }
+      else                  { tSc = 0.12; tOp = 0.48; tTint = 0; }
 
-      let tSc:number;
-      if(isPrimary)            tSc = 0.26;
-      else if(isEmphasized)    tSc = 0.13;
-      else if(anyHov||anyLink) tSc = 0.06;
-      else                     tSc = 0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
-
-      const tOp = isPrimary ? 1.0 : isEmphasized ? 0.95 : (anyHov||anyLink) ? 0.05 : 0.48;
-      opacs.current[i]+=(tOp-opacs.current[i])*Math.min(delta*9,1);
-
-      const tTint = (isPrimary||isEmphasized) ? 1 : 0;
+      opacs.current[i] +=(tOp-opacs.current[i]) *Math.min(delta*9,1);
       tintTs.current[i]+=(tTint-tintTs.current[i])*Math.min(delta*9,1);
 
       if(iAmHov){
@@ -324,18 +335,15 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       }
 
       _wPos.copy(PPOS[i].base).applyQuaternion(_gQ);
-      if(!anyHov && !anyLink){
+      if(!photoActive){
         bobs.current[i]+=delta*0.55;
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      if(isPrimary){
-        mesh.position.lerp(_screenCtr, Math.min(delta*12,1));
-      } else {
-        mesh.position.lerp(_wPos, Math.min(delta*12,1));
-      }
+      if(iAmHov) mesh.position.lerp(_screenCtr, Math.min(delta*12,1));
+      else       mesh.position.lerp(_wPos,      Math.min(delta*12,1));
       mesh.scale.setScalar(scales.current[i]);
-      mesh.renderOrder = iAmHov ? 12 : isEmphasized ? (10 + i/N) : (6 + i/N);
+      mesh.renderOrder = iAmHov ? 12 : (6 + i/N);
 
       mesh.quaternion.copy(camera.quaternion);
       if(rotYs.current[i]!==0 || rotZs.current[i]!==0){
@@ -349,8 +357,30 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       mat.color.copy(_col);
     }
 
-    // ── Borders track their bound photos (pool, not per-photo)
+    // ── Arcs: transform base points into world space, pulse opacity by arcF.
     const active = aActiveCount.current;
+    for(let li=0; li<active; li++){
+      const pts = aBasePts.current[li];
+      if(!pts || !pts.length) continue;
+      const arr = aArrs[li];
+      for(let k=0; k<pts.length; k++){
+        _wPos.copy(pts[k]).applyQuaternion(_gQ);
+        arr[k*3]=_wPos.x; arr[k*3+1]=_wPos.y; arr[k*3+2]=_wPos.z;
+      }
+      aGeos[li].attributes.position.needsUpdate = true;
+      const target = (0.30 + 0.18*Math.sin(t*2.4 + li*0.35)) * arcF;
+      aMats[li].opacity += (target - aMats[li].opacity) * 0.22;
+      aLines[li].visible = aMats[li].opacity > 0.01;
+    }
+    // Slots beyond active fade out fast.
+    for(let li=active; li<POOL; li++){
+      if(aMats[li].opacity > 0.01){
+        aMats[li].opacity *= 0.85;
+        if(aMats[li].opacity < 0.01){ aMats[li].opacity = 0; aLines[li].visible = false; }
+      }
+    }
+
+    // ── Borders track their bound photos, opacity scaled by borderF.
     for(let li=0; li<POOL; li++){
       const border = borderRefs.current[li];
       const bMat = borderMatRefs.current[li];
@@ -359,24 +389,28 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
         const j = borderPhotoMap.current[li];
         const pMesh = visRefs.current[j];
         if(pMesh){
-          const tBorder = 0.40 + 0.18*Math.sin(t*2.4 + li*0.4);
-          borderOpacs.current[li] += (tBorder - borderOpacs.current[li]) * Math.min(delta*6, 1);
+          const target = (0.45 + 0.20*Math.sin(t*2.4 + li*0.4)) * borderF;
+          borderOpacs.current[li] += (target - borderOpacs.current[li]) * Math.min(delta*8, 1);
           bMat.opacity = borderOpacs.current[li];
-          border.visible = true;
-          border.position.copy(pMesh.position);
-          border.quaternion.copy(pMesh.quaternion);
-          border.scale.copy(pMesh.scale).multiplyScalar(1.22);
-          border.renderOrder = pMesh.renderOrder - 0.5;
+          if(bMat.opacity > 0.01){
+            border.visible = true;
+            border.position.copy(pMesh.position);
+            border.quaternion.copy(pMesh.quaternion);
+            border.scale.copy(pMesh.scale).multiplyScalar(1.22);
+            border.renderOrder = pMesh.renderOrder - 0.5;
+          } else {
+            border.visible = false;
+          }
         }
       } else if(borderOpacs.current[li] > 0.01){
-        borderOpacs.current[li] += (0 - borderOpacs.current[li]) * 0.20;
+        borderOpacs.current[li] *= 0.85;
         bMat.opacity = borderOpacs.current[li];
         if(borderOpacs.current[li] < 0.01){ border.visible = false; bMat.opacity = 0; }
       }
     }
 
-    // ── Gold glow behind hovered photo
-    const glowTarget = h>=0 ? visRefs.current[h] : null;
+    // ── Gold glow behind hovered photo (only when nothing's open)
+    const glowTarget = (h >= 0 && o < 0) ? visRefs.current[h] : null;
     if(glowTarget){
       glowMesh.visible=true;
       glowMesh.position.copy(glowTarget.position);
@@ -388,21 +422,24 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       if(glowMat.opacity < 0.01){ glowMesh.visible = false; glowMat.opacity = 0; }
     }
 
-    // ── Arc opacity pulse (geometry already set on link change)
-    for(let li=0; li<active; li++){
-      const target = 0.30 + 0.18*Math.sin(t*2.4 + li*0.35);
-      aMats[li].opacity += (target - aMats[li].opacity) * 0.18;
-    }
-
-    // ── Pin pulse
-    if(anyLink){
-      pinMat.opacity = 0.30 + 0.30*Math.sin(t*3.5);
+    // ── Pin line — shows where the pivot photo sits on the globe surface.
+    if(pivot >= 0){
+      _wPos.copy(PPOS[pivot].base).applyQuaternion(_gQ);
+      _wSurf.copy(PPOS[pivot].surf).applyQuaternion(_gQ);
+      pinArr[0]=_wPos.x;pinArr[1]=_wPos.y;pinArr[2]=_wPos.z;
+      pinArr[3]=_wSurf.x;pinArr[4]=_wSurf.y;pinArr[5]=_wSurf.z;
+      pinGeo.attributes.position.needsUpdate=true;
+      const target = (0.30 + 0.30*Math.sin(t*3.5)) * arcF;
+      pinMat.opacity += (target - pinMat.opacity) * 0.22;
+      pinLine.visible = pinMat.opacity > 0.01;
+    } else if(pinMat.opacity > 0.01){
+      pinMat.opacity *= 0.85;
+      if(pinMat.opacity < 0.01){ pinMat.opacity = 0; pinLine.visible = false; }
     }
   });
 
   // ── Pointer handlers ────────────────────────────────────────────────────────
   const debounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const clickTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const handleOver=(i:number)=>(e:{stopPropagation:()=>void})=>{
     e.stopPropagation();
@@ -428,19 +465,9 @@ function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChang
       }
     },80);
   };
-  // Distinguish single vs double click via a short delay
   const handleClick=(i:number)=>(e:{stopPropagation:()=>void})=>{
     e.stopPropagation();
-    if(clickTimerRef.current){
-      clearTimeout(clickTimerRef.current);
-      clickTimerRef.current=null;
-      onDoubleClick(i);
-      return;
-    }
-    clickTimerRef.current = setTimeout(()=>{
-      clickTimerRef.current = null;
-      onSingleClick(i);
-    }, 240);
+    onClick(i);
   };
 
   return(
@@ -539,7 +566,7 @@ function HoverOverlay({hoveredIdx,fullOpenIdx}:{hoveredIdx:number;fullOpenIdx:nu
         <div style={{marginTop:'0.6rem',textAlign:'center'}}>
           <p style={{fontFamily:'"Cormorant Garamond",serif',fontSize:'1.05rem',fontStyle:'italic',color:'rgba(255,255,255,0.82)',margin:0,letterSpacing:'0.04em'}}>{photo.label}</p>
           {photo.people.length>0&&<p style={{fontFamily:'Inter,sans-serif',fontSize:'0.58rem',letterSpacing:'0.14em',color:'rgba(201,168,76,0.65)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.people.filter(p=>p!=='Anibal Cabral').slice(0,3).join(' · ')}</p>}
-          <p style={{fontFamily:'Inter,sans-serif',fontSize:'0.52rem',letterSpacing:'0.18em',color:'rgba(255,255,255,0.2)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.date.slice(0,12)} · Click for month · Double-click to open</p>
+          <p style={{fontFamily:'Inter,sans-serif',fontSize:'0.52rem',letterSpacing:'0.18em',color:'rgba(255,255,255,0.2)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.date.slice(0,12)} · Click to open</p>
         </div>
       )}
     </div>
@@ -600,57 +627,63 @@ function PhotoOverlay({fullOpenIdx,onClose}:{fullOpenIdx:number;onClose:()=>void
 export default function WorldAtlasGlobe(){
   const[ready,setReady]=useState(false);
   const[hoveredIdx,setHoveredIdx]=useState(-1);
-  const[linkedIdx,setLinkedIdx]=useState(-1);     // single-click → month strings
-  const[fullOpenIdx,setFullOpenIdx]=useState(-1); // double-click → full overlay
+  const[fullOpenIdx,setFullOpenIdx]=useState(-1);
 
-  const globeRef       = useRef<THREE.Group|null>(null);
-  const pausedRef      = useRef(false);
-  const globalHovRef   = useRef(-1);
-  const globalLinkedRef= useRef(-1);
-  const fullOpenRef    = useRef(-1);
+  const globeRef     = useRef<THREE.Group|null>(null);
+  const pausedRef    = useRef(false);
+  const globalHovRef = useRef(-1);
+  const globalOpenRef= useRef(-1);
+  // (pivot, mode) drives arcs+borders. Mode runs hover → open → fading → none.
+  const linkPivotRef = useRef(-1);
+  const linkModeRef  = useRef<LinkMode>('none');
+  const fadeStartRef = useRef(0);
 
-  useEffect(()=>{globalLinkedRef.current=linkedIdx;},[linkedIdx]);
-  useEffect(()=>{fullOpenRef.current=fullOpenIdx;},[fullOpenIdx]);
-
-  // Globe spins unless hovered or full-open. Linked-mode alone never pauses;
-  // it only persists while hovering, and hover already pauses.
   const recomputePause = useCallback(()=>{
-    pausedRef.current = globalHovRef.current>=0 || fullOpenRef.current>=0;
+    pausedRef.current = globalHovRef.current>=0 || globalOpenRef.current>=0;
   },[]);
 
   const handleHoverChange=useCallback((i:number)=>{
     globalHovRef.current = i;
     setHoveredIdx(i);
-    // Hover-out clears month-link mode — image closes back down, globe resumes.
-    if(i<0 && globalLinkedRef.current>=0){
-      globalLinkedRef.current = -1;
-      setLinkedIdx(-1);
+    if(globalOpenRef.current >= 0){
+      // Overlay is open — hover doesn't change which photo's links glow.
+    } else if(i >= 0){
+      linkPivotRef.current = i;
+      linkModeRef.current = 'hover';
+      fadeStartRef.current = 0;
+    } else {
+      // Hover out with nothing open → links snap off immediately.
+      linkPivotRef.current = -1;
+      linkModeRef.current = 'none';
+      fadeStartRef.current = 0;
     }
     recomputePause();
   },[recomputePause]);
 
-  const handleSingleClick=useCallback((i:number)=>{
-    // Toggle: same photo clicked again clears the link.
-    const next = globalLinkedRef.current===i ? -1 : i;
-    globalLinkedRef.current = next;
-    setLinkedIdx(next);
-  },[]);
-
-  const handleDoubleClick=useCallback((i:number)=>{
-    // Open full overlay; clear hover/link to dismiss the centered hover card.
-    globalLinkedRef.current = -1;
-    setLinkedIdx(-1);
-    globalHovRef.current = -1;
-    setHoveredIdx(-1);
-    fullOpenRef.current = i;
+  const handleClick=useCallback((i:number)=>{
+    // Single click — open the overlay. Snaps to new pivot (cancels any fade).
+    globalOpenRef.current = i;
     setFullOpenIdx(i);
-    pausedRef.current = true;
+    linkPivotRef.current = i;
+    linkModeRef.current = 'open';
+    fadeStartRef.current = 0;
+    recomputePause();
     document.body.style.cursor='';
-  },[]);
+  },[recomputePause]);
 
   const handleCloseFull=useCallback(()=>{
-    fullOpenRef.current = -1;
+    globalOpenRef.current = -1;
     setFullOpenIdx(-1);
+    if(globalHovRef.current >= 0){
+      // Mouse is over a photo — switch back to hover mode for that one.
+      linkPivotRef.current = globalHovRef.current;
+      linkModeRef.current = 'hover';
+      fadeStartRef.current = 0;
+    } else {
+      // No hover — start the 2 s hold + slow fade.
+      linkModeRef.current = 'fading';
+      fadeStartRef.current = performance.now();
+    }
     recomputePause();
   },[recomputePause]);
 
@@ -672,10 +705,12 @@ export default function WorldAtlasGlobe(){
         <FloatingHolograms
           globeRef={globeRef}
           globalHoverRef={globalHovRef}
-          globalLinkedRef={globalLinkedRef}
+          globalOpenRef={globalOpenRef}
+          linkPivotRef={linkPivotRef}
+          linkModeRef={linkModeRef}
+          fadeStartRef={fadeStartRef}
           onHoverChange={handleHoverChange}
-          onSingleClick={handleSingleClick}
-          onDoubleClick={handleDoubleClick}
+          onClick={handleClick}
         />
 
         <OrbitControls makeDefault enablePan={false} enableDamping dampingFactor={0.06} minDistance={3.5} maxDistance={12} rotateSpeed={0.55} zoomSpeed={0.7}/>
@@ -690,7 +725,7 @@ export default function WorldAtlasGlobe(){
 
       {fullOpenIdx<0&&(
         <div style={{position:'fixed',bottom:'2.2rem',left:'50%',transform:'translateX(-50%)',fontFamily:'Inter,sans-serif',fontSize:'0.58rem',letterSpacing:'0.22em',color:'rgba(255,255,255,0.15)',textTransform:'uppercase',textAlign:'center',pointerEvents:'none',opacity:ready?1:0,transition:'opacity 2s ease 1.5s'}}>
-          Hover · Click for month · Double-click to open · ESC to close
+          Hover · Click to open · ESC to close
         </div>
       )}
     </div>
