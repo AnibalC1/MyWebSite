@@ -18,27 +18,22 @@ const PHOTOS = RAW_DATA as GalleryPhoto[];
 const N = PHOTOS.length;
 
 // ─── Module-level constants & temporaries (no GC pressure) ───────────────────
-const R            = 2.4;
-const GOLDEN_ANGLE = Math.PI*(3-Math.sqrt(5));
-const THIRTY_DAYS  = 30*24*3600;
+const R = 2.4;
 
-// Reusable temporaries — never allocate in useFrame
-const _gQ    = new THREE.Quaternion(); // globe world quat
-const _cinQ  = new THREE.Quaternion(); // cinematic rotation quat
+const _gQ    = new THREE.Quaternion();
+const _cinQ  = new THREE.Quaternion();
 const _euler = new THREE.Euler();
-const _wPos  = new THREE.Vector3();    // scratch world position
-const _wSurf = new THREE.Vector3();    // scratch surface position
+const _wPos  = new THREE.Vector3();
+const _wSurf = new THREE.Vector3();
 const _col   = new THREE.Color();
-const _clusterTgt = new THREE.Vector3();  // scratch cluster target
-const _screenCtr   = new THREE.Vector3();  // viewport center in world space
-const _V6_LOCAL    = new THREE.Vector3(0, 0, -3.5); // 3.5 units in front of camera — in front of globe
-const _tintCol  = new THREE.Color(0.55, 0.82, 1.0); // cyan holographic at rest
-const _clearCol = new THREE.Color(1, 1, 1);          // full color on hover
+const _screenCtr = new THREE.Vector3();
+const _tintCol  = new THREE.Color(0.55, 0.82, 1.0);
+const _clearCol = new THREE.Color(1, 1, 1);
 
-// Shared PlaneGeometry — 4:3 ratio, created once
 const SHARED_GEO = new THREE.PlaneGeometry(1.333, 1);
-SHARED_GEO.computeBoundingSphere(); // ensure frustum culling works
-const SHARED_HIT_GEO = new THREE.SphereGeometry(0.08, 6, 6); // hit detection sphere — invisible, static
+SHARED_GEO.computeBoundingSphere();
+const SHARED_BORDER_GEO = new THREE.PlaneGeometry(1.333, 1);
+SHARED_BORDER_GEO.computeBoundingSphere();
 
 // ─── Geo helpers ─────────────────────────────────────────────────────────────
 function ll2v(lat:number,lon:number,r=R){
@@ -49,14 +44,13 @@ function arcPts(a:[number,number],b:[number,number],elev=0.55,steps=72){
   const v0=ll2v(a[0],a[1]),v1=ll2v(b[0],b[1]);
   return new THREE.QuadraticBezierCurve3(v0,v0.clone().add(v1).normalize().multiplyScalar(R+elev),v1).getPoints(steps);
 }
-function tangentFrame(lat:number,lng:number):[THREE.Vector3,THREE.Vector3]{
-  const n=ll2v(lat,lng,1),up=new THREE.Vector3(0,1,0);
-  const t1=up.clone().sub(n.clone().multiplyScalar(up.dot(n))).normalize();
-  return [t1, new THREE.Vector3().crossVectors(n,t1).normalize()];
+function arcPtsFromVec(v0:THREE.Vector3,v1:THREE.Vector3,elev=0.45,steps=32){
+  const mid=v0.clone().add(v1).normalize().multiplyScalar(R+elev);
+  return new THREE.QuadraticBezierCurve3(v0.clone(),mid,v1.clone()).getPoints(steps);
 }
+function monthKey(ts:number){const d=new Date(ts*1000);return `${d.getUTCFullYear()}-${d.getUTCMonth()}`;}
 
 // ─── Pre-compute positions ────────────────────────────────────────────────────
-// ─── Fibonacci sphere distribution — evenly covers entire globe ───────────────
 interface PPos { base:THREE.Vector3; surf:THREE.Vector3; }
 const PPOS:PPos[] = (()=>{
   const gr=(1+Math.sqrt(5))/2;
@@ -73,23 +67,20 @@ const PPOS:PPos[] = (()=>{
   });
 })();
 
-// ─── Connections ──────────────────────────────────────────────────────────────
-interface Conn{toIdx:number;type:'ps'|'pw'|'ti'|'lo';}  // ps=people-strong, pw=people-weak, ti=time, lo=location
-const LINE_COL  ={'ps':'#c9a84c','pw':'#c9a84c','ti':'#ff66cc','lo':'#00d2ff'} as const;
-const LINE_OPA  ={'ps':0.80,'pw':0.45,'ti':0.32,'lo':0.24} as const;
-
-const CONNS:Conn[][] = PHOTOS.map((p,i)=>{
-  const res:Conn[]=[];
-  for(let j=0;j<N&&res.length<12;j++){
-    if(j===i)continue;const q=PHOTOS[j];
-    const sh=p.people.filter(x=>q.people.includes(x)).length;
-    if(sh>=2){res.push({toIdx:j,type:'ps'});continue;}
-    if(sh===1){res.push({toIdx:j,type:'pw'});continue;}
-    if(Math.abs(p.ts-q.ts)<=THIRTY_DAYS){res.push({toIdx:j,type:'ti'});continue;}
-    if(p.cluster===q.cluster&&res.length<6)res.push({toIdx:j,type:'lo'});
-  }
-  return res.sort((a,b)=>({ps:0,pw:1,ti:2,lo:3}[a.type]-{ps:0,pw:1,ti:2,lo:3}[b.type])).slice(0,12);
-});
+// ─── Month buckets — photos sharing the same calendar year+month ─────────────
+const MONTH_MATES:number[][] = (()=>{
+  const buckets = new Map<string, number[]>();
+  PHOTOS.forEach((p,i)=>{
+    const k = monthKey(p.ts);
+    if(!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k)!.push(i);
+  });
+  return PHOTOS.map((_,i)=>{
+    const k = monthKey(PHOTOS[i].ts);
+    return buckets.get(k)!.filter(j=>j!==i);
+  });
+})();
+const MAX_MATES = MONTH_MATES.reduce((m,a)=>Math.max(m,a.length),0);
 
 // ─── Earth components (compact) ───────────────────────────────────────────────
 function EarthSphere(){return<mesh renderOrder={0}><sphereGeometry args={[R,64,64]}/><meshPhongMaterial color="#000d1a" emissive="#003366" emissiveIntensity={0.12} transparent opacity={0.96} depthWrite/></mesh>;}
@@ -140,115 +131,96 @@ function GlobeGroup({globeRef,pausedRef}:{globeRef:React.RefObject<THREE.Group|n
 interface HoloProps{
   globeRef:React.RefObject<THREE.Group|null>;
   globalHoverRef:React.MutableRefObject<number>;
-  globalSelectRef:React.MutableRefObject<number>;
+  globalLinkedRef:React.MutableRefObject<number>;
   onHoverChange:(i:number)=>void;
-  onSelect:(i:number)=>void;
+  onSingleClick:(i:number)=>void;
+  onDoubleClick:(i:number)=>void;
 }
 
-function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChange,onSelect}:HoloProps){
-  // ── v8: TWO meshes per photo ──────────────────────────────────────────────────
-  // visRefs  = visual photo plane, raycast DISABLED — flies freely, no pointer events
-  // hitRefs  = invisible sphere, STAYS at globe base position, fires all pointer events
+const ARC_STEPS = 32;
+
+function FloatingHolograms({globeRef,globalHoverRef,globalLinkedRef,onHoverChange,onSingleClick,onDoubleClick}:HoloProps){
+  // visRefs = visual photo plane (raycast disabled), hitRefs = invisible static hit sphere on globe
   const visRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
   const hitRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
   const matRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(PHOTOS.map(()=>null));
+  // borderRefs = pool of glow border planes (one per photo, only month-mates show)
+  const borderRefs =useRef<(THREE.Mesh|null)[]>(PHOTOS.map(()=>null));
+  const borderMatRefs =useRef<(THREE.MeshBasicMaterial|null)[]>(PHOTOS.map(()=>null));
 
-  // Gold glow plane — single mesh that tracks the hovered visual position
+  // Gold glow plane behind hovered photo
   const glowMat =useMemo(()=>new THREE.MeshBasicMaterial({color:'#c9a84c',transparent:true,opacity:0,depthTest:false}),[]);
   const glowMesh=useMemo(()=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(1.333,1.0),glowMat);m.renderOrder=8;return m;},[glowMat]);
 
-  // Per-photo animation state (all refs — no useState = no glitches)
-  const scales  =useRef(new Float32Array(N).fill(0.12));
-  const opacs   =useRef(new Float32Array(N).fill(0.48));
-  const rotYs   =useRef(new Float32Array(N).fill(0));
-  const rotZs   =useRef(new Float32Array(N).fill(0));
-  const tintTs  =useRef(new Float32Array(N).fill(0));   // 0=tinted, 1=full color
-  const bobs    =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
-  // Cluster state — ring layout (no orbit drift, computed once per hover change)
-  const ringAngles      =useRef(new Float32Array(N).fill(0));  // angle on ring per photo
-  const ringRadii       =useRef(new Float32Array(N).fill(0));  // radius (0 = not in cluster)
-  const stableScreenCtr =useRef(new THREE.Vector3());            // screen center locked at hover-start
-  const prevHovRef  =useRef(-1);
-  const prevSelRef  =useRef(-1);
-  const tiIdxsRef   =useRef<number[]>([]);
-  const tiSetRef    =useRef(new Set<number>());
-  const connSetRef  =useRef(new Set<number>());
+  // Per-photo animation state
+  const scales      =useRef(new Float32Array(N).fill(0.12));
+  const opacs       =useRef(new Float32Array(N).fill(0.48));
+  const rotYs       =useRef(new Float32Array(N).fill(0));
+  const rotZs       =useRef(new Float32Array(N).fill(0));
+  const tintTs      =useRef(new Float32Array(N).fill(0));
+  const borderOpacs =useRef(new Float32Array(N).fill(0));
+  const bobs        =useRef(new Float32Array(N).map((_,i)=>Math.random()*Math.PI*2+i));
 
-  // Texture loading
+  // Linked-mode tracking
+  const prevLinkedRef = useRef(-1);
+  const matesSetRef   = useRef(new Set<number>());
+
+  // Texture loading — limited concurrency
   useEffect(()=>{
     let idx=0,active=0;
     const next=()=>{ while(idx<N&&active<20){const i=idx++;active++;new THREE.TextureLoader().load(PHOTOS[i].src,t=>{t.colorSpace=THREE.SRGBColorSpace;active--;if(matRefs.current[i]){matRefs.current[i]!.map=t;matRefs.current[i]!.needsUpdate=true;}next();},undefined,()=>{active--;next();});} };
     next();
   },[]);
 
-  // Connection lines pool (12 slots)
-  const cMats=useMemo(()=>Array.from({length:12},()=>new THREE.LineBasicMaterial({color:'#c9a84c',transparent:true,opacity:0,depthTest:false})),[]);
-  const cArrs=useMemo(()=>Array.from({length:12},()=>new Float32Array(6)),[]);
-  const cGeos=useMemo(()=>cArrs.map(arr=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(arr,3));return g;}),[cArrs]);
-  const cLines=useMemo(()=>cGeos.map((g,i)=>new THREE.Line(g,cMats[i])),[cGeos,cMats]);
+  // Arc line pool — sized to largest possible month bucket
+  const POOL = Math.max(MAX_MATES, 8);
+  const aArrs = useMemo(()=>Array.from({length:POOL},()=>new Float32Array((ARC_STEPS+1)*3)),[POOL]);
+  const aGeos = useMemo(()=>aArrs.map(arr=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(arr,3));g.setDrawRange(0, ARC_STEPS+1);return g;}),[aArrs]);
+  const aMats = useMemo(()=>Array.from({length:POOL},()=>new THREE.LineBasicMaterial({color:'#ffd66b',transparent:true,opacity:0,depthTest:false,blending:THREE.AdditiveBlending})),[POOL]);
+  const aLines = useMemo(()=>aGeos.map((g,i)=>{const l=new THREE.Line(g,aMats[i]); l.renderOrder=7; l.frustumCulled=false; return l;}),[aGeos,aMats]);
 
-  // Pin line
-  const pinMat=useMemo(()=>new THREE.LineBasicMaterial({color:'#c9a84c',transparent:true,opacity:0,depthTest:false}),[]);
+  // Base-space arc points (recomputed only when linkedIdx changes)
+  const aBasePts = useRef<THREE.Vector3[][]>(Array.from({length:POOL},()=>[]));
+  const aActiveCount = useRef(0);
+
+  // Pin line — shows where the linked photo's globe position is
+  const pinMat=useMemo(()=>new THREE.LineBasicMaterial({color:'#ffd66b',transparent:true,opacity:0,depthTest:false}),[]);
   const pinArr=useMemo(()=>new Float32Array(6),[]);
   const pinGeo=useMemo(()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pinArr,3));return g;},[pinArr]);
   const pinLine=useMemo(()=>new THREE.Line(pinGeo,pinMat),[pinGeo,pinMat]);
 
   useFrame(({camera},delta) => {
-    const h=globalHoverRef.current, s=globalSelectRef.current;
-    const anyHov=h>=0, anySel=s>=0;
+    const h=globalHoverRef.current, s=globalLinkedRef.current;
+    const anyHov=h>=0, anyLink=s>=0;
     _screenCtr.set(0,0,-3.5).applyMatrix4(camera.matrixWorld);
 
-    // ── Recompute cluster targets when hover OR select changes — no allocations in hot path
-    const effectivePivot=h>=0?h:s;
-    if(h !== prevHovRef.current || s !== prevSelRef.current){
-      prevHovRef.current=h;
-      prevSelRef.current=s;
-      tiIdxsRef.current=[];
-      tiSetRef.current.clear();
-      connSetRef.current.clear();
-      if(s>=0) CONNS[s].forEach(c=>connSetRef.current.add(c.toIdx));
-      if(effectivePivot>=0){
-        const pivotTs=PHOTOS[effectivePivot].ts;
-        const pivotCluster=PHOTOS[effectivePivot].cluster;
-        const related:Array<{j:number;dt:number;pri:number}>=[];
-        for(let j=0;j<N;j++){
-          if(j===effectivePivot)continue;
-          const dt=Math.abs(PHOTOS[j].ts-pivotTs);
-          const sameCluster=PHOTOS[j].cluster===pivotCluster;
-          if(sameCluster||dt<=THIRTY_DAYS) related.push({j,dt,pri:sameCluster?0:1});
+    // ── Recompute month-mate set & arc base points when linked changes
+    if(s !== prevLinkedRef.current){
+      prevLinkedRef.current = s;
+      matesSetRef.current.clear();
+      aActiveCount.current = 0;
+      if(s >= 0){
+        const mates = MONTH_MATES[s];
+        const limit = Math.min(mates.length, POOL);
+        const v0 = PPOS[s].base;
+        for(let li=0; li<limit; li++){
+          const j = mates[li];
+          matesSetRef.current.add(j);
+          aBasePts.current[li] = arcPtsFromVec(v0, PPOS[j].base, 0.45, ARC_STEPS);
         }
-        related.sort((a,b)=>a.pri-b.pri||a.dt-b.dt);
-        const capped=related.slice(0,20);
-        tiIdxsRef.current=capped.map(r=>r.j);
-        capped.forEach(({j})=>tiSetRef.current.add(j));
-        // Flat ring layout — inner ring (≤10), outer ring (overflow)
-        const INNER_MAX=8;
-        const inner=capped.slice(0,Math.min(capped.length,INNER_MAX));
-        const outer=capped.slice(INNER_MAX,Math.min(capped.length,INNER_MAX+12));
-        ringAngles.current.fill(0); ringRadii.current.fill(0);
-        inner.forEach(({j},k)=>{
-          ringAngles.current[j]=(k/inner.length)*Math.PI*2;
-          ringRadii.current[j]=0.60;  // r≥0.543 for 8 photos@0.26scale — no overlap
-        });
-        const outerStep=outer.length>0?Math.PI/outer.length:0;
-        outer.forEach(({j},k)=>{
-          ringAngles.current[j]=(k/outer.length)*Math.PI*2+outerStep;
-          ringRadii.current[j]=0.88;
-        });
+        aActiveCount.current = limit;
       }
     }
 
-    const tiSet=tiSetRef.current;
-    const anyActive=anyHov||anySel;
-    const isClickedCluster=!anyHov&&anySel; // cluster persisting after click, mouse moved away
+    const matesSet = matesSetRef.current;
 
-    // Get globe world quaternion once
+    // Globe world quaternion
     if(globeRef.current) globeRef.current.getWorldQuaternion(_gQ);
     else _gQ.identity();
 
     const t=performance.now()/1000;
 
-    // ── Hit spheres track globe rotation every frame (invisible, static hit targets)
+    // Hit spheres track globe rotation (invisible static hit targets)
     for(let i=0;i<N;i++){
       const hit=hitRefs.current[i];
       if(hit){ _wPos.copy(PPOS[i].base).applyQuaternion(_gQ); hit.position.copy(_wPos); }
@@ -258,27 +230,26 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       const mesh=visRefs.current[i];const mat=matRefs.current[i];
       if(!mesh||!mat)continue;
 
-      // Keep hit sphere pinned to globe surface (always at _wPos before we modify it)
-      const hitMesh=hitRefs.current[i];
+      const iAmHov  = i===h;
+      const iAmLink = i===s;
+      const isMate  = matesSet.has(i);
+      const isPrimary = iAmHov; // centered photo
+      const isEmphasized = iAmLink || isMate;
 
-      const iAmHov=i===h, iAmSel=i===s, iAmConn=connSetRef.current.has(i);
-
-      // ── Scale target
-      const iAmTi=tiSet.has(i);
+      // ── Scale target — only the hovered photo flies to center
       let tSc:number;
-      // v8.1: scale parity confirmed — center=ring=0.26, glow=1.04x, opacity≤0.40
-      if(iAmHov||iAmSel||iAmTi) tSc=0.26;
-      else if(iAmConn) tSc=0.14;
-      else if(anyActive) tSc=0.06;
-      else tSc=0.12;
+      if(isPrimary)            tSc = 0.26;
+      else if(isEmphasized)    tSc = 0.13;
+      else if(anyHov||anyLink) tSc = 0.06;
+      else                     tSc = 0.12;
       scales.current[i]+=(tSc-scales.current[i])*Math.min(delta*9,1);
 
       // ── Opacity target
-      const tOp=(iAmHov||iAmSel||iAmTi)?1.0:iAmConn?0.80:anyActive?0.05:0.48;
+      const tOp = isPrimary ? 1.0 : isEmphasized ? 0.95 : (anyHov||anyLink) ? 0.05 : 0.48;
       opacs.current[i]+=(tOp-opacs.current[i])*Math.min(delta*9,1);
 
-      // ── Tint target (0=cyan holographic, 1=full color)
-      const tTint=(iAmHov||iAmSel)?1:iAmConn?0.5:iAmTi?1:0;  // cluster always full color
+      // ── Tint (0=cyan holographic, 1=full color)
+      const tTint = (isPrimary||isEmphasized) ? 1 : 0;
       tintTs.current[i]+=(tTint-tintTs.current[i])*Math.min(delta*9,1);
 
       // ── Cinematic rotation — spring back to 0
@@ -292,85 +263,97 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       // ── World position = base position rotated by globe
       _wPos.copy(PPOS[i].base).applyQuaternion(_gQ);
 
-      // ── Bob (only when nothing hovered/selected)
-      if(!anyActive){
+      // Bob only when nothing active
+      if(!anyHov && !anyLink){
         bobs.current[i]+=delta*0.55;
         _wPos.y+=Math.sin(bobs.current[i])*0.009;
       }
 
-      // Pin hit sphere to globe surface — never moves regardless of visual mesh position
-      if(hitMesh) hitMesh.position.copy(_wPos);
-
-      // ── Position: hovered → stable screen center; cluster → ring around it
-      if(iAmHov||iAmSel){
+      // ── Position: hovered → screen center; everything else → globe surface
+      if(isPrimary){
         mesh.position.lerp(_screenCtr, Math.min(delta*12,1));
-      } else if(anyActive && iAmTi && ringRadii.current[i]>0){
-        const ang=ringAngles.current[i];
-        const rad=ringRadii.current[i]*(isClickedCluster?0.60:1.0);
-        // Camera-space ring: offset in screen plane regardless of camera orbit
-        _clusterTgt.set(Math.cos(ang)*rad, Math.sin(ang)*rad, -3.5).applyMatrix4(camera.matrixWorld);
-        mesh.position.lerp(_clusterTgt, Math.min(delta*12,1));
       } else {
         mesh.position.lerp(_wPos, Math.min(delta*12,1));
       }
       mesh.scale.setScalar(scales.current[i]);
-      // unique fractional renderOrder per tier — fixes depthTest:false flicker; inactive=9 not 8 (avoids glow mesh at 8)
-      mesh.renderOrder = iAmHov ? 12 : iAmSel ? 11 : iAmTi ? (9 + i/N) : (6 + i/N);
+      mesh.renderOrder = iAmHov ? 12 : isEmphasized ? (10 + i/N) : (6 + i/N);
 
-      // ── Billboard: face camera (world-space mesh, no parent transform)
+      // Billboard
       mesh.quaternion.copy(camera.quaternion);
-
-      // ── Apply cinematic rotation on top of billboard
-      if(rotYs.current[i]!==0||rotZs.current[i]!==0){
-        _euler.set(rotZs.current[i],rotYs.current[i],0,'YXZ');
+      if(rotYs.current[i]!==0 || rotZs.current[i]!==0){
+        _euler.set(rotZs.current[i], rotYs.current[i], 0, 'YXZ');
         _cinQ.setFromEuler(_euler);
         mesh.quaternion.multiply(_cinQ);
       }
 
-      // ── Material opacity & color
-      mat.opacity=opacs.current[i];
-      _col.copy(_tintCol).lerp(_clearCol,tintTs.current[i]);
+      mat.opacity = opacs.current[i];
+      _col.copy(_tintCol).lerp(_clearCol, tintTs.current[i]);
       mat.color.copy(_col);
+
+      // ── Glow border (month-mates only) — pulses to indicate luminating link
+      const border = borderRefs.current[i];
+      const bMat = borderMatRefs.current[i];
+      if(border && bMat){
+        const tBorder = isMate ? (0.55 + 0.30*Math.sin(t*2.8 + i*0.4)) : 0;
+        borderOpacs.current[i] += (tBorder - borderOpacs.current[i]) * Math.min(delta*6, 1);
+        bMat.opacity = borderOpacs.current[i];
+        if(borderOpacs.current[i] > 0.01){
+          border.visible = true;
+          border.position.copy(mesh.position);
+          border.quaternion.copy(mesh.quaternion);
+          border.scale.copy(mesh.scale).multiplyScalar(1.22);
+          border.renderOrder = mesh.renderOrder - 0.5;
+        } else {
+          border.visible = false;
+        }
+      }
     }
 
-    // ── Gold glow — tracks hovered/selected visual mesh
-    const glowTarget=h>=0?visRefs.current[h]:s>=0?visRefs.current[s]:null;
+    // ── Gold glow behind primary (hovered) photo
+    const glowTarget = h>=0 ? visRefs.current[h] : null;
     if(glowTarget){
       glowMesh.visible=true;
       glowMesh.position.copy(glowTarget.position);
       glowMesh.quaternion.copy(camera.quaternion);
-      glowMat.opacity=0.30+0.10*Math.sin(t*2.2);
-      glowMesh.scale.setScalar(scales.current[h>=0?h:s]);
+      glowMat.opacity = 0.30 + 0.10*Math.sin(t*2.2);
+      glowMesh.scale.setScalar(scales.current[h]);
     } else {
-      glowMat.opacity+=(0-glowMat.opacity)*0.18;
-      if(glowMat.opacity<0.01) glowMesh.visible=false;
+      glowMat.opacity += (0 - glowMat.opacity) * 0.18;
+      if(glowMat.opacity < 0.01) glowMesh.visible = false;
     }
 
-    // ── Connection lines
-    const connData=anySel?CONNS[s]:[];
-    connData.slice(0,12).forEach((c,li)=>{
-      _wPos.copy(PPOS[s].base).applyQuaternion(_gQ);
-      _wSurf.copy(PPOS[c.toIdx].base).applyQuaternion(_gQ);
-      cArrs[li][0]=_wPos.x;cArrs[li][1]=_wPos.y;cArrs[li][2]=_wPos.z;
-      cArrs[li][3]=_wSurf.x;cArrs[li][4]=_wSurf.y;cArrs[li][5]=_wSurf.z;
-      cGeos[li].attributes.position.needsUpdate=true;
-      cMats[li].color.set(LINE_COL[c.type]);
-      cMats[li].opacity+=(LINE_OPA[c.type]-cMats[li].opacity)*0.12;
-    });
-    for(let li=connData.length;li<12;li++) cMats[li].opacity+=(0-cMats[li].opacity)*0.18;
+    // ── Luminating arcs — from linked photo to each month-mate
+    const active = aActiveCount.current;
+    for(let li=0; li<POOL; li++){
+      if(li < active){
+        const pts = aBasePts.current[li];
+        const arr = aArrs[li];
+        for(let k=0; k<pts.length; k++){
+          _wPos.copy(pts[k]).applyQuaternion(_gQ);
+          arr[k*3]=_wPos.x; arr[k*3+1]=_wPos.y; arr[k*3+2]=_wPos.z;
+        }
+        aGeos[li].attributes.position.needsUpdate = true;
+        const target = 0.55 + 0.30*Math.sin(t*3.4 + li*0.35);
+        aMats[li].opacity += (target - aMats[li].opacity) * 0.18;
+      } else if(aMats[li].opacity > 0.01){
+        aMats[li].opacity += (0 - aMats[li].opacity) * 0.20;
+      }
+    }
 
-    // ── Pin line (selected → earth surface)
-    if(anySel){
+    // ── Pin line (linked photo → globe surface)
+    if(anyLink){
       _wPos.copy(PPOS[s].base).applyQuaternion(_gQ);
       _wSurf.copy(PPOS[s].surf).applyQuaternion(_gQ);
       pinArr[0]=_wPos.x;pinArr[1]=_wPos.y;pinArr[2]=_wPos.z;
       pinArr[3]=_wSurf.x;pinArr[4]=_wSurf.y;pinArr[5]=_wSurf.z;
       pinGeo.attributes.position.needsUpdate=true;
-      pinMat.opacity=0.28+0.28*Math.sin(t*3.5);
-    } else { pinMat.opacity+=(0-pinMat.opacity)*0.18; }
+      pinMat.opacity = 0.30 + 0.30*Math.sin(t*3.5);
+    } else { pinMat.opacity += (0 - pinMat.opacity) * 0.18; }
   });
 
+  // ── Pointer handlers ────────────────────────────────────────────────────────
   const debounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const clickTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const handleOver=(i:number)=>(e:{stopPropagation:()=>void})=>{
     e.stopPropagation();
@@ -385,27 +368,49 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       document.body.style.cursor='pointer';
     },_hd);
   };
-  // v8: handleOut checks which photo fired — hit sphere stays on globe so only genuine
-  // mouse-exit fires this. 80ms debounce guards against micro-jitter between spheres.
   const handleOut=(i:number)=>()=>{
-    if(globalHoverRef.current!==i) return; // already moved to a different photo
+    if(globalHoverRef.current!==i) return;
     if(debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current=setTimeout(()=>{
-      if(globalHoverRef.current===i){ // still same photo after debounce
+      if(globalHoverRef.current===i){
         globalHoverRef.current=-1;
         onHoverChange(-1);
         document.body.style.cursor='';
       }
     },80);
   };
+  // Distinguish single vs double click via a short delay
   const handleClick=(i:number)=>(e:{stopPropagation:()=>void})=>{
     e.stopPropagation();
-    onSelect(i);
+    if(clickTimerRef.current){
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current=null;
+      onDoubleClick(i);
+      return;
+    }
+    clickTimerRef.current = setTimeout(()=>{
+      clickTimerRef.current = null;
+      onSingleClick(i);
+    }, 240);
   };
 
   return(
     <group>
-      {/* Visual photo planes — raycast disabled, fly freely to center */}
+      {/* Glow border planes — one per photo, hidden unless month-mate */}
+      {PHOTOS.map((_,i)=>(
+        <mesh key={`bd-${i}`}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ref={(el:any)=>{borderRefs.current[i]=el;}}
+          geometry={SHARED_BORDER_GEO}
+          visible={false}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          raycast={()=>{}}
+        >
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <meshBasicMaterial ref={(el:any)=>{borderMatRefs.current[i]=el;}} color="#ffd66b" transparent opacity={0} side={THREE.DoubleSide} depthTest={false} blending={THREE.AdditiveBlending}/>
+        </mesh>
+      ))}
+      {/* Visual photo planes — raycast disabled */}
       {PHOTOS.map((_,i)=>(
         <mesh key={`vis-${i}`}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -436,17 +441,16 @@ function FloatingHolograms({globeRef,globalHoverRef,globalSelectRef,onHoverChang
       ))}
       <primitive object={glowMesh}/>
       <primitive object={pinLine}/>
-      {cLines.map((l,i)=><primitive key={i} object={l}/>)}
+      {aLines.map((l,i)=><primitive key={`arc-${i}`} object={l}/>)}
     </group>
   );
 }
 
-// ─── Hover overlay (centered, pointer-events:none, disappears on mouse-out) ───
-function HoverOverlay({hoveredIdx,selectedIdx}:{hoveredIdx:number;selectedIdx:number}){
+// ─── Hover overlay (centered, pointer-events:none) ────────────────────────────
+function HoverOverlay({hoveredIdx,fullOpenIdx}:{hoveredIdx:number;fullOpenIdx:number}){
   const cardRef=useRef<HTMLDivElement>(null);
   const prevIdx=useRef(-1);
-  // Show only when hovering and nothing is selected (selected overlay takes priority)
-  const photo=hoveredIdx>=0&&selectedIdx<0?PHOTOS[hoveredIdx]:null;
+  const photo = hoveredIdx>=0 && fullOpenIdx<0 ? PHOTOS[hoveredIdx] : null;
 
   useEffect(()=>{
     const card=cardRef.current;
@@ -460,7 +464,6 @@ function HoverOverlay({hoveredIdx,selectedIdx}:{hoveredIdx:number;selectedIdx:nu
     }
     if(hoveredIdx===prevIdx.current)return;
     prevIdx.current=hoveredIdx;
-    // Random cinematic spin entry — different direction each hover
     const ry=(Math.random()>0.5?1:-1)*(42+Math.random()*46);
     const rx=(Math.random()-0.5)*26;
     const rz=(Math.random()-0.5)*14;
@@ -488,65 +491,58 @@ function HoverOverlay({hoveredIdx,selectedIdx}:{hoveredIdx:number;selectedIdx:nu
         <div style={{marginTop:'0.6rem',textAlign:'center'}}>
           <p style={{fontFamily:'"Cormorant Garamond",serif',fontSize:'1.05rem',fontStyle:'italic',color:'rgba(255,255,255,0.82)',margin:0,letterSpacing:'0.04em'}}>{photo.label}</p>
           {photo.people.length>0&&<p style={{fontFamily:'Inter,sans-serif',fontSize:'0.58rem',letterSpacing:'0.14em',color:'rgba(201,168,76,0.65)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.people.filter(p=>p!=='Anibal Cabral').slice(0,3).join(' · ')}</p>}
-          <p style={{fontFamily:'Inter,sans-serif',fontSize:'0.52rem',letterSpacing:'0.18em',color:'rgba(255,255,255,0.2)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.date.slice(0,12)} · Click for connections</p>
+          <p style={{fontFamily:'Inter,sans-serif',fontSize:'0.52rem',letterSpacing:'0.18em',color:'rgba(255,255,255,0.2)',textTransform:'uppercase',margin:'0.2rem 0 0'}}>{photo.date.slice(0,12)} · Click for month · Double-click to open</p>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Photo overlay (click only) ───────────────────────────────────────────────
-function PhotoOverlay({selectedIdx,onClose}:{selectedIdx:number;onClose:()=>void;}){
+// ─── Photo overlay (double-click full view) ───────────────────────────────────
+function PhotoOverlay({fullOpenIdx,onClose}:{fullOpenIdx:number;onClose:()=>void;}){
   const cardRef=useRef<HTMLDivElement>(null);
   const bdRef  =useRef<HTMLDivElement>(null);
   const prevSel=useRef(-1);
 
-  const photo=selectedIdx>=0?PHOTOS[selectedIdx]:null;
-  const conns=selectedIdx>=0?CONNS[selectedIdx]:[];
-  const pCt=conns.filter(c=>c.type==='ps'||c.type==='pw').length;
-  const tCt=conns.filter(c=>c.type==='ti').length;
-  const lCt=conns.filter(c=>c.type==='lo').length;
+  const photo = fullOpenIdx>=0 ? PHOTOS[fullOpenIdx] : null;
+  const mateCount = fullOpenIdx>=0 ? MONTH_MATES[fullOpenIdx].length : 0;
 
   useEffect(()=>{
     const card=cardRef.current,bd=bdRef.current;
     if(!card||!bd)return;
-    if(selectedIdx<0){
+    if(fullOpenIdx<0){
       card.style.transition='opacity 0.22s ease,transform 0.22s ease';
       card.style.opacity='0';card.style.transform='translate(-50%,-50%) scale(0.94)';
       bd.style.transition='opacity 0.22s ease';bd.style.opacity='0';bd.style.pointerEvents='none';
       prevSel.current=-1;return;
     }
-    if(selectedIdx===prevSel.current)return;
-    prevSel.current=selectedIdx;
-    // Snap to hidden
+    if(fullOpenIdx===prevSel.current)return;
+    prevSel.current=fullOpenIdx;
     const ease='cubic-bezier(0.22,1,0.36,1)';
     card.style.transition='none';
     card.style.opacity='0';card.style.transform='translate(-50%,-50%) perspective(1000px) rotateY(12deg) scale(0.88)';
     bd.style.transition='none';bd.style.opacity='0';
     void card.getBoundingClientRect();
-    // Animate to visible
     card.style.transition=`opacity 0.3s ease,transform 0.5s ${ease}`;
     card.style.opacity='1';card.style.transform='translate(-50%,-50%) perspective(1000px) rotateY(0deg) scale(1)';
     bd.style.transition='opacity 0.3s ease';bd.style.opacity='1';bd.style.pointerEvents='auto';
-  },[selectedIdx]);
+  },[fullOpenIdx]);
 
   return(
     <>
       <div ref={bdRef} onClick={onClose} style={{position:'fixed',inset:0,zIndex:90,background:'rgba(0,0,0,0.70)',backdropFilter:'blur(5px)',opacity:0,pointerEvents:'none'}}/>
       <div ref={cardRef} style={{position:'fixed',top:'50%',left:'50%',zIndex:100,opacity:0,transform:'translate(-50%,-50%) scale(0.94)',display:'flex',flexDirection:'column',alignItems:'center',maxWidth:'min(88vw,900px)',pointerEvents:'none'}}>
-        <div style={{border:'1px solid rgba(201,168,76,0.45)',boxShadow:'0 0 60px rgba(201,168,76,0.14)',borderRadius:'4px',overflow:'hidden',background:'#000',maxHeight:'78vh',pointerEvents:'auto'}}>
-          {photo&&<img src={photo.src} alt="" style={{display:'block',maxWidth:'100%',maxHeight:'78vh',objectFit:'contain'}}/>}
+        <div style={{position:'relative',border:'1px solid rgba(201,168,76,0.45)',boxShadow:'0 0 60px rgba(201,168,76,0.14)',borderRadius:'4px',overflow:'visible',background:'#000',maxHeight:'78vh',pointerEvents:'auto'}}>
+          {photo&&<img src={photo.src} alt="" style={{display:'block',maxWidth:'100%',maxHeight:'78vh',objectFit:'contain',borderRadius:'4px'}}/>}
+          <button onClick={onClose} aria-label="Close" style={{position:'absolute',top:'-12px',right:'-12px',background:'rgba(0,6,16,0.95)',border:'1px solid rgba(255,214,107,0.55)',color:'rgba(255,255,255,0.85)',borderRadius:'50%',width:'30px',height:'30px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.85rem',lineHeight:1,pointerEvents:'auto',boxShadow:'0 0 16px rgba(255,214,107,0.25)'}}>×</button>
         </div>
         {photo&&(
           <div style={{marginTop:'0.75rem',textAlign:'center',display:'flex',flexDirection:'column',gap:'0.22rem',pointerEvents:'auto'}}>
             <p style={{fontFamily:'"Cormorant Garamond",serif',fontSize:'1.1rem',color:'rgba(255,255,255,0.88)',margin:0,letterSpacing:'0.05em'}}>{photo.label} · {photo.date.slice(0,12)}</p>
             {photo.people.length>0&&<p style={{fontFamily:'Inter,sans-serif',fontSize:'0.6rem',letterSpacing:'0.15em',color:'rgba(201,168,76,0.72)',textTransform:'uppercase',margin:0}}>{photo.people.join(' · ')}</p>}
-            {conns.length>0&&<p style={{fontFamily:'Inter,sans-serif',fontSize:'0.55rem',letterSpacing:'0.12em',color:'rgba(0,210,255,0.55)',textTransform:'uppercase',margin:'0.15rem 0 0'}}>
-              {pCt>0&&`${pCt} shared people`}{tCt>0&&` · ${tCt} same timeframe`}{lCt>0&&` · ${lCt} same place`}
-            </p>}
+            {mateCount>0&&<p style={{fontFamily:'Inter,sans-serif',fontSize:'0.55rem',letterSpacing:'0.12em',color:'rgba(255,214,107,0.55)',textTransform:'uppercase',margin:'0.15rem 0 0'}}>{mateCount} photos that month</p>}
           </div>
         )}
-        <button onClick={onClose} style={{position:'absolute',top:'-10px',right:'-10px',background:'rgba(0,6,16,0.92)',border:'1px solid rgba(0,212,255,0.22)',color:'rgba(255,255,255,0.55)',borderRadius:'50%',width:'26px',height:'26px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',pointerEvents:'auto'}}>×</button>
       </div>
     </>
   );
@@ -556,39 +552,62 @@ function PhotoOverlay({selectedIdx,onClose}:{selectedIdx:number;onClose:()=>void
 export default function WorldAtlasGlobe(){
   const[ready,setReady]=useState(false);
   const[hoveredIdx,setHoveredIdx]=useState(-1);
-  const[selectedIdx,setSelectedIdx]=useState(-1);
+  const[linkedIdx,setLinkedIdx]=useState(-1);     // single-click → month strings
+  const[fullOpenIdx,setFullOpenIdx]=useState(-1); // double-click → full overlay
 
-  // Shared refs — written by Three.js, read by DOM
-  const globeRef     =useRef<THREE.Group|null>(null);
-  const pausedRef    =useRef(false);
-  const globalHovRef =useRef(-1);
-  const globalSelRef =useRef(-1);
+  const globeRef       = useRef<THREE.Group|null>(null);
+  const pausedRef      = useRef(false);
+  const globalHovRef   = useRef(-1);
+  const globalLinkedRef= useRef(-1);
+  const fullOpenRef    = useRef(-1);
 
-  useEffect(()=>{globalSelRef.current=selectedIdx;},[selectedIdx]);
+  useEffect(()=>{globalLinkedRef.current=linkedIdx;},[linkedIdx]);
+  useEffect(()=>{fullOpenRef.current=fullOpenIdx;},[fullOpenIdx]);
+
+  // Globe spins unless hovered or full-open. Linked-mode alone never pauses;
+  // it only persists while hovering, and hover already pauses.
+  const recomputePause = useCallback(()=>{
+    pausedRef.current = globalHovRef.current>=0 || fullOpenRef.current>=0;
+  },[]);
 
   const handleHoverChange=useCallback((i:number)=>{
-    pausedRef.current=i>=0||globalSelRef.current>=0;
+    globalHovRef.current = i;
     setHoveredIdx(i);
+    // Hover-out clears month-link mode — image closes back down, globe resumes.
+    if(i<0 && globalLinkedRef.current>=0){
+      globalLinkedRef.current = -1;
+      setLinkedIdx(-1);
+    }
+    recomputePause();
+  },[recomputePause]);
+
+  const handleSingleClick=useCallback((i:number)=>{
+    // Toggle: same photo clicked again clears the link.
+    const next = globalLinkedRef.current===i ? -1 : i;
+    globalLinkedRef.current = next;
+    setLinkedIdx(next);
   },[]);
 
-  const handleSelect=useCallback((i:number)=>{
-    const next=globalSelRef.current===i?-1:i;
-    setSelectedIdx(next);
-    globalSelRef.current=next;
-    pausedRef.current=next>=0||globalHovRef.current>=0;
-  },[]);
-
-  const handleClose=useCallback(()=>{
+  const handleDoubleClick=useCallback((i:number)=>{
+    // Open full overlay; clear hover/link to dismiss the centered hover card.
+    globalLinkedRef.current = -1;
+    setLinkedIdx(-1);
+    globalHovRef.current = -1;
     setHoveredIdx(-1);
-    setSelectedIdx(-1);
-    globalSelRef.current=-1;
-    globalHovRef.current=-1;
-    pausedRef.current=false;
+    fullOpenRef.current = i;
+    setFullOpenIdx(i);
+    pausedRef.current = true;
     document.body.style.cursor='';
   },[]);
 
+  const handleCloseFull=useCallback(()=>{
+    fullOpenRef.current = -1;
+    setFullOpenIdx(-1);
+    recomputePause();
+  },[recomputePause]);
+
   useEffect(()=>{const t=setTimeout(()=>setReady(true),200);return()=>clearTimeout(t);},[]);
-  useEffect(()=>{const k=(e:KeyboardEvent)=>{if(e.key==='Escape')handleClose();};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k);},[handleClose]);
+  useEffect(()=>{const k=(e:KeyboardEvent)=>{if(e.key==='Escape')handleCloseFull();};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k);},[handleCloseFull]);
 
   return(
     <div style={{position:'fixed',inset:0,background:'radial-gradient(ellipse at 40% 45%,#00091a 0%,#000000 75%)',opacity:ready?1:0,transition:'opacity 1.2s ease'}}>
@@ -600,16 +619,15 @@ export default function WorldAtlasGlobe(){
         <pointLight position={[-10,-5,-10]} intensity={0.2} color="#002244"/>
         <Stars radius={50} depth={50} count={4000} factor={3.5} fade speed={0.6}/>
 
-        {/* Globe (Earth + cage, rotates) */}
         <GlobeGroup globeRef={globeRef} pausedRef={pausedRef}/>
 
-        {/* Photos — outside GlobeGroup, positions tracked via globeRef every frame */}
         <FloatingHolograms
           globeRef={globeRef}
           globalHoverRef={globalHovRef}
-          globalSelectRef={globalSelRef}
+          globalLinkedRef={globalLinkedRef}
           onHoverChange={handleHoverChange}
-          onSelect={handleSelect}
+          onSingleClick={handleSingleClick}
+          onDoubleClick={handleDoubleClick}
         />
 
         <OrbitControls makeDefault enablePan={false} enableDamping dampingFactor={0.06} minDistance={3.5} maxDistance={12} rotateSpeed={0.55} zoomSpeed={0.7}/>
@@ -619,15 +637,12 @@ export default function WorldAtlasGlobe(){
         </EffectComposer>
       </Canvas>
 
-      {/* Hover overlay — centered, pointer-events:none, spin-in animation */}
-      <HoverOverlay hoveredIdx={hoveredIdx} selectedIdx={selectedIdx}/>
+      <HoverOverlay hoveredIdx={hoveredIdx} fullOpenIdx={fullOpenIdx}/>
+      <PhotoOverlay fullOpenIdx={fullOpenIdx} onClose={handleCloseFull}/>
 
-      {/* Click overlay — DOM */}
-      <PhotoOverlay selectedIdx={selectedIdx} onClose={handleClose}/>
-
-      {selectedIdx<0&&(
+      {fullOpenIdx<0&&(
         <div style={{position:'fixed',bottom:'2.2rem',left:'50%',transform:'translateX(-50%)',fontFamily:'Inter,sans-serif',fontSize:'0.58rem',letterSpacing:'0.22em',color:'rgba(255,255,255,0.15)',textTransform:'uppercase',textAlign:'center',pointerEvents:'none',opacity:ready?1:0,transition:'opacity 2s ease 1.5s'}}>
-          Hover a memory · Click to reveal connections · ESC to close
+          Hover · Click for month · Double-click to open · ESC to close
         </div>
       )}
     </div>
