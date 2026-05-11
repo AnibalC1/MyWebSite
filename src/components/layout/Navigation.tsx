@@ -56,9 +56,7 @@ export default function Navigation({ transparent = true, large = false }: Props)
           pointerEvents: 'auto',
         }}
       >
-        <Link href="/" aria-label="Home" style={{ display: 'inline-flex', alignItems: 'center' }}>
-          <LogoSpin height={large ? 120 : 96} />
-        </Link>
+        <LogoSpin height={large ? 120 : 96} />
 
         <div className="nav-desktop" style={{ display: 'flex', alignItems: 'center', gap: '2.2rem' }}>
           {NAV_LINKS.map(({ href, label }) => {
