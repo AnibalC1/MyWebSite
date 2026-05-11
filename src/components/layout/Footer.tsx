@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 
 const SITEMAP = [
   { label: 'Gallery', href: '/gallery' },
@@ -24,37 +23,38 @@ export default function Footer() {
   return (
     <footer
       style={{
-        background: 'var(--obsidian)',
-        borderTop: '1px solid rgba(201,168,76,0.08)',
+        background: 'var(--obsidian-deep)',
+        borderTop: '1px solid var(--border)',
+        position: 'relative',
       }}
     >
-      <div className="max-w-[1280px] mx-auto px-6 py-24">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-16">
+      <div className="container-wide" style={{ paddingBlock: 'clamp(5rem, 9vw, 7rem)' }}>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-16">
           {/* Brand + Newsletter */}
-          <div className="md:col-span-5">
+          <div className="md:col-span-6 lg:col-span-5">
+            <span className="eyebrow eyebrow--plain" style={{ marginBottom: '1.25rem', display: 'block' }}>
+              Anibal Cabral
+            </span>
             <p
-              className="font-light tracking-[-0.02em] mb-4"
+              className="h2"
               style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(1.5rem, 3vw, 2.2rem)',
-                color: 'var(--warm-white)',
+                fontSize: 'clamp(1.6rem, 2.6vw + 0.4rem, 2.4rem)',
+                lineHeight: 1.18,
+                marginBottom: '1.25rem',
+                maxWidth: '22ch',
               }}
             >
-              Anibal Cabral
+              Systems built deliberately. Words worth keeping.
             </p>
-            <p
-              className="text-sm leading-relaxed mb-8 max-w-[36ch]"
-              style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}
-            >
-              Systems builder. Father. BJJ practitioner. Writing about engineering, leadership, and living deliberately.
+            <p className="body" style={{ maxWidth: '40ch', marginBottom: '2.25rem' }}>
+              A monthly letter on engineering, leadership, and living deliberately. No hype, no growth hacks.
             </p>
 
-            {/* Newsletter — Buttondown */}
             <form
               action="https://buttondown.email/api/emails/embed-subscribe/anibalcabral"
               method="post"
               target="_blank"
-              className="flex flex-col gap-3"
+              className="flex flex-col gap-3 max-w-[440px]"
               onSubmit={(e) => {
                 const form = e.currentTarget;
                 const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
@@ -64,49 +64,16 @@ export default function Footer() {
                 }
               }}
             >
-              <p
-                className="text-[0.6rem] uppercase tracking-[0.2em]"
-                style={{ color: 'var(--gold-subtle)', fontFamily: 'var(--font-body)' }}
-              >
-                Newsletter
-              </p>
               <div className="flex gap-2">
                 <input
                   type="email"
                   name="email"
                   placeholder="your@email.com"
                   required
-                  className="flex-1"
-                  style={{
-                    background: 'var(--graphite)',
-                    border: '1px solid var(--steel)',
-                    color: 'var(--warm-white)',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: '0.85rem',
-                    padding: '12px 14px',
-                    outline: 'none',
-                    transition: 'border-color 200ms',
-                  }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--gold-subtle)')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--steel)')}
+                  className="field"
+                  style={{ flex: 1, fontSize: '0.85rem', padding: '12px 14px' }}
                 />
-                <button
-                  type="submit"
-                  className="text-[0.65rem] uppercase tracking-[0.15em] px-5 py-3 transition-all duration-200"
-                  style={{
-                    background: 'var(--gold)',
-                    color: 'var(--obsidian)',
-                    fontFamily: 'var(--font-body)',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#b8975e';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--gold)';
-                  }}
-                >
+                <button type="submit" className="btn btn-primary" style={{ padding: '0.85rem 1.4rem', fontSize: '0.62rem' }}>
                   Join
                 </button>
               </div>
@@ -114,31 +81,14 @@ export default function Footer() {
           </div>
 
           {/* Sitemap */}
-          <div className="md:col-span-3 md:col-start-7">
-            <p
-              className="text-[0.6rem] uppercase tracking-[0.2em] mb-6"
-              style={{ color: 'var(--gold-subtle)', fontFamily: 'var(--font-body)' }}
-            >
+          <div className="md:col-span-3 md:col-start-8 lg:col-start-9">
+            <span className="eyebrow eyebrow--plain" style={{ marginBottom: '1.5rem', display: 'block' }}>
               Explore
-            </p>
+            </span>
             <ul className="flex flex-col gap-3">
               {SITEMAP.map(({ label, href }) => (
                 <li key={href}>
-                  <Link
-                    href={href}
-                    className="text-sm transition-colors duration-200"
-                    style={{
-                      color: 'var(--warm-white-muted)',
-                      fontFamily: 'var(--font-body)',
-                      textDecoration: 'none',
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.color = 'var(--gold)')
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.color = 'var(--warm-white-muted)')
-                    }
-                  >
+                  <Link href={href} className="link-inline" style={{ fontSize: '0.9rem' }}>
                     {label}
                   </Link>
                 </li>
@@ -147,13 +97,10 @@ export default function Footer() {
           </div>
 
           {/* Social */}
-          <div className="md:col-span-3">
-            <p
-              className="text-[0.6rem] uppercase tracking-[0.2em] mb-6"
-              style={{ color: 'var(--gold-subtle)', fontFamily: 'var(--font-body)' }}
-            >
+          <div className="md:col-span-3 lg:col-span-3">
+            <span className="eyebrow eyebrow--plain" style={{ marginBottom: '1.5rem', display: 'block' }}>
               Connect
-            </p>
+            </span>
             <ul className="flex flex-col gap-3">
               {SOCIALS.map(({ label, href }) => (
                 <li key={label}>
@@ -161,23 +108,11 @@ export default function Footer() {
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm transition-colors duration-200"
-                    style={{
-                      color: 'var(--warm-white-muted)',
-                      fontFamily: 'var(--font-body)',
-                      textDecoration: 'none',
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.color = 'var(--gold)')
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.color = 'var(--warm-white-muted)')
-                    }
+                    className="link-inline"
+                    style={{ fontSize: '0.9rem', display: 'inline-flex', alignItems: 'baseline', gap: '0.4rem' }}
                   >
                     {label}
-                    <span className="ml-1" style={{ fontSize: '0.75rem', opacity: 0.5 }}>
-                      ↗
-                    </span>
+                    <span style={{ opacity: 0.5, fontSize: '0.75rem' }}>↗</span>
                   </a>
                 </li>
               ))}
@@ -187,18 +122,20 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div
-          className="mt-24 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4"
-          style={{ borderTop: '1px solid rgba(201,168,76,0.06)' }}
+          className="mt-20 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4"
+          style={{ borderTop: '1px solid var(--border)' }}
         >
-          <p
-            className="text-[0.65rem] tracking-[0.1em]"
-            style={{ color: 'var(--steel-light)', fontFamily: 'var(--font-body)' }}
-          >
-            © {new Date().getFullYear()} Anibal Cabral. Built with intention.
+          <p className="caption" style={{ letterSpacing: '0.08em' }}>
+            © {new Date().getFullYear()} Anibal Cabral · Built with intention
           </p>
           <p
-            className="text-[0.6rem] tracking-[0.1em] uppercase"
-            style={{ color: 'var(--steel-light)', fontFamily: 'var(--font-body)' }}
+            className="caption"
+            style={{
+              letterSpacing: '0.28em',
+              textTransform: 'uppercase',
+              fontSize: '0.62rem',
+              color: 'var(--gold-subtle)',
+            }}
           >
             Systems over hype
           </p>

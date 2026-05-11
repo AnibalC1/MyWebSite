@@ -1,14 +1,16 @@
-'use client'
+'use client';
 
-import { useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import Link from 'next/link'
-import Navigation from '@/components/layout/Navigation'
-import Footer from '@/components/layout/Footer'
-import { MemoryNode, NodeCategory, CATEGORY_COLORS, deriveConnections } from '@/lib/nodes'
-import rawNodes from '@/data/nodes.json'
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Navigation from '@/components/layout/Navigation';
+import Footer from '@/components/layout/Footer';
+import PageHero from '@/components/ui/PageHero';
+import Reveal from '@/components/ui/Reveal';
+import Eyebrow from '@/components/ui/Eyebrow';
+import { MemoryNode, NodeCategory, CATEGORY_COLORS, deriveConnections } from '@/lib/nodes';
+import rawNodes from '@/data/nodes.json';
 
-const nodes = rawNodes as MemoryNode[]
+const nodes = rawNodes as MemoryNode[];
 
 const CATEGORY_LABELS: Record<NodeCategory, string> = {
   systems:    'Systems',
@@ -19,15 +21,15 @@ const CATEGORY_LABELS: Record<NodeCategory, string> = {
   builds:     'Builds',
   fitness:    'Fitness',
   writing:    'Writing',
-}
+};
 
-const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as NodeCategory[]
+const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as NodeCategory[];
 
 function NodeCard({ node, onClick }: { node: MemoryNode; onClick: () => void }) {
-  const color = CATEGORY_COLORS[node.category] ?? '#c9a96e'
+  const color = CATEGORY_COLORS[node.category] ?? '#c9a96e';
   const date = new Date(node.timestamp).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short',
-  })
+  });
 
   return (
     <motion.button
@@ -35,62 +37,62 @@ function NodeCard({ node, onClick }: { node: MemoryNode; onClick: () => void }) 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       onClick={onClick}
-      className="text-left w-full group"
+      className="text-left w-full group h-full"
       style={{
-        background: 'var(--graphite)',
-        border: '1px solid var(--steel)',
-        padding: '28px',
+        background: 'var(--obsidian)',
+        padding: '2rem 1.75rem',
         cursor: 'pointer',
-        transition: 'border-color 300ms',
+        transition: 'background 300ms var(--ease-luxury)',
+        position: 'relative',
       }}
-      whileHover={{ borderColor: color }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--graphite)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'var(--obsidian)'; }}
     >
-      {/* Color bar */}
-      <div style={{ height: '2px', background: color, marginBottom: '20px', opacity: 0.8 }} />
+      <div style={{ height: '1px', background: color, marginBottom: '20px', opacity: 0.7, width: '32px' }} />
 
-      {/* Category + date */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-5">
         <span
-          className="text-[0.65rem] uppercase tracking-[0.2em]"
-          style={{ color, fontFamily: 'var(--font-body)' }}
+          className="caption"
+          style={{
+            fontSize: '0.6rem',
+            letterSpacing: '0.26em',
+            textTransform: 'uppercase',
+            color,
+          }}
         >
           {CATEGORY_LABELS[node.category]}
         </span>
-        <span
-          className="text-[0.65rem] tracking-wide"
-          style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}
-        >
+        <span className="caption" style={{ fontSize: '0.62rem', letterSpacing: '0.14em' }}>
           {date}
         </span>
       </div>
 
-      {/* Title */}
       <h3
-        className="text-xl font-light italic leading-tight mb-3"
-        style={{ fontFamily: 'var(--font-display)', color: 'var(--warm-white)' }}
+        className="h3 mb-3"
+        style={{
+          fontSize: '1.3rem',
+          fontStyle: 'italic',
+          lineHeight: 1.22,
+        }}
       >
         {node.title}
       </h3>
 
-      {/* Excerpt */}
-      <p
-        className="text-sm leading-relaxed"
-        style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}
-      >
-        {node.excerpt}
-      </p>
+      <p className="body" style={{ fontSize: '0.92rem' }}>{node.excerpt}</p>
 
-      {/* Emotional tag */}
       {node.emotionalTag && (
-        <div className="mt-5">
+        <div className="mt-6">
           <span
-            className="text-[0.6rem] uppercase tracking-widest px-2 py-1"
+            className="caption"
             style={{
+              fontSize: '0.58rem',
+              letterSpacing: '0.24em',
+              textTransform: 'uppercase',
               border: `1px solid ${color}40`,
               color: `${color}cc`,
-              fontFamily: 'var(--font-body)',
+              padding: '0.22rem 0.55rem',
             }}
           >
             {node.emotionalTag}
@@ -98,7 +100,7 @@ function NodeCard({ node, onClick }: { node: MemoryNode; onClick: () => void }) 
         </div>
       )}
     </motion.button>
-  )
+  );
 }
 
 function DetailPanel({
@@ -107,15 +109,15 @@ function DetailPanel({
   onClose,
   onSelect,
 }: {
-  node: MemoryNode
-  related: MemoryNode[]
-  onClose: () => void
-  onSelect: (n: MemoryNode) => void
+  node: MemoryNode;
+  related: MemoryNode[];
+  onClose: () => void;
+  onSelect: (n: MemoryNode) => void;
 }) {
-  const color = CATEGORY_COLORS[node.category] ?? '#c9a96e'
+  const color = CATEGORY_COLORS[node.category] ?? '#c9a96e';
   const date = new Date(node.timestamp).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
-  })
+  });
 
   return (
     <AnimatePresence>
@@ -126,65 +128,63 @@ function DetailPanel({
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-40"
         onClick={onClose}
-        style={{ background: 'rgba(10,10,11,0.6)', backdropFilter: 'blur(4px)' }}
+        style={{ background: 'rgba(10,10,11,0.7)', backdropFilter: 'blur(6px)' }}
       />
       <motion.div
         key="panel"
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md flex flex-col overflow-y-auto"
-        style={{ background: 'var(--graphite)', borderLeft: '1px solid var(--steel)' }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg flex flex-col overflow-y-auto"
+        style={{ background: 'var(--graphite)', borderLeft: '1px solid var(--border-strong)' }}
       >
         <div style={{ height: '2px', background: color, flexShrink: 0 }} />
 
-        <div className="p-8 flex-1">
+        <div style={{ padding: '2.5rem clamp(1.75rem, 4vw, 2.5rem)' }} className="flex-1">
           <button
             onClick={onClose}
-            className="mb-8 text-xs uppercase tracking-widest hover:opacity-100 transition-opacity"
-            style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)', opacity: 0.5 }}
+            className="caption mb-10 inline-flex items-center gap-2 link-inline"
+            style={{ letterSpacing: '0.24em', textTransform: 'uppercase' }}
           >
-            ← Close
+            <span aria-hidden>←</span> Close
           </button>
 
-          <div className="text-xs uppercase tracking-widest mb-3" style={{ color, fontFamily: 'var(--font-body)' }}>
-            {CATEGORY_LABELS[node.category]}
-          </div>
+          <Eyebrow plain>
+            <span style={{ color }}>{CATEGORY_LABELS[node.category]}</span>
+          </Eyebrow>
 
-          <h2
-            className="text-3xl font-light italic leading-tight mb-2"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--warm-white)' }}
-          >
-            {node.title}
-          </h2>
+          <h2 className="h2 mt-6 mb-3" style={{ fontStyle: 'italic' }}>{node.title}</h2>
 
-          <p className="text-sm mb-6" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
+          <p className="caption mb-8" style={{ letterSpacing: '0.14em' }}>
             {date}{node.location ? ` · ${node.location}` : ''}
           </p>
 
-          <div style={{ height: '1px', background: 'var(--steel)', marginBottom: '24px' }} />
+          <div className="hairline mb-8" />
 
-          <p className="text-base leading-relaxed mb-8" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
-            {node.excerpt}
-          </p>
+          <p className="body-lg mb-10">{node.excerpt}</p>
 
           {node.emotionalTag && (
             <span
-              className="text-xs uppercase tracking-widest px-3 py-1.5"
-              style={{ border: `1px solid ${color}40`, color: `${color}cc`, fontFamily: 'var(--font-body)' }}
+              className="caption"
+              style={{
+                fontSize: '0.6rem',
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+                border: `1px solid ${color}40`,
+                color: `${color}cc`,
+                padding: '0.35rem 0.7rem',
+              }}
             >
               {node.emotionalTag}
             </span>
           )}
 
           {related.length > 0 && (
-            <div className="mt-10">
-              <div style={{ height: '1px', background: 'var(--steel)', marginBottom: '20px' }} />
-              <p className="text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
-                Connected
-              </p>
-              <div className="flex flex-col gap-2">
+            <div className="mt-12">
+              <div className="hairline mb-6" />
+              <Eyebrow plain>Connected</Eyebrow>
+              <div className="flex flex-col gap-2 mt-5">
                 {related.slice(0, 4).map(r => (
                   <button
                     key={r.id}
@@ -196,6 +196,7 @@ function DetailPanel({
                       color: 'var(--warm-white)',
                       fontFamily: 'var(--font-display)',
                       fontStyle: 'italic',
+                      fontSize: '1rem',
                     }}
                   >
                     {r.title}
@@ -207,96 +208,95 @@ function DetailPanel({
         </div>
       </motion.div>
     </AnimatePresence>
-  )
+  );
 }
 
 export default function MemoryAtlasPage() {
-  const [activeCategory, setActiveCategory] = useState<NodeCategory | 'all'>('all')
-  const [selectedNode, setSelectedNode] = useState<MemoryNode | null>(null)
-  const connections = useMemo(() => deriveConnections(nodes), [])
+  const [activeCategory, setActiveCategory] = useState<NodeCategory | 'all'>('all');
+  const [selectedNode, setSelectedNode] = useState<MemoryNode | null>(null);
+  const connections = useMemo(() => deriveConnections(nodes), []);
 
   const filtered = useMemo(() =>
     activeCategory === 'all' ? nodes : nodes.filter(n => n.category === activeCategory),
     [activeCategory]
-  )
+  );
 
   const relatedNodes = useMemo(() => {
-    if (!selectedNode) return []
-    const ids = connections.get(selectedNode.id) ?? []
-    return nodes.filter(n => ids.includes(n.id))
-  }, [selectedNode, connections])
+    if (!selectedNode) return [];
+    const ids = connections.get(selectedNode.id) ?? [];
+    return nodes.filter(n => ids.includes(n.id));
+  }, [selectedNode, connections]);
 
-  const categories = ALL_CATEGORIES.filter(c => nodes.some(n => n.category === c))
+  const categories = ALL_CATEGORIES.filter(c => nodes.some(n => n.category === c));
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--obsidian)' }}>
       <Navigation />
 
-      {/* Header */}
-      <div className="max-w-[1280px] mx-auto px-6 pt-40 pb-16">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <p className="text-[0.6875rem] tracking-[0.35em] uppercase mb-5" style={{ color: '#4a4845', fontFamily: 'var(--font-body)' }}>
-            Memory Atlas
-          </p>
-          <h1
-            className="font-light leading-[0.9] tracking-[-0.03em] mb-6"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--warm-white)', fontSize: 'clamp(3rem, 8vw, 7rem)' }}
-          >
-            The Constellation
-          </h1>
-          <p className="text-base max-w-[55ch] leading-relaxed" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
-            Every node is a moment, decision, or discipline that shaped the system. Click any to go deeper.
-          </p>
-        </motion.div>
-      </div>
+      <PageHero
+        eyebrow="Memory Atlas"
+        eyebrowIndex="·"
+        title="The constellation."
+        lede="Every node is a moment, decision, or discipline that shaped the system. Click any to go deeper."
+      />
 
-      {/* Category filters */}
-      <div className="max-w-[1280px] mx-auto px-6 pb-12">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveCategory('all')}
-            className="text-xs uppercase tracking-widest px-4 py-2 transition-all duration-200"
-            style={{
-              fontFamily: 'var(--font-body)',
-              background: activeCategory === 'all' ? 'var(--gold)' : 'transparent',
-              color: activeCategory === 'all' ? 'var(--obsidian)' : 'var(--warm-white-muted)',
-              border: `1px solid ${activeCategory === 'all' ? 'var(--gold)' : 'var(--steel)'}`,
-            }}
-          >
-            All
-          </button>
-          {categories.map(cat => {
-            const color = CATEGORY_COLORS[cat]
-            const active = activeCategory === cat
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className="text-xs uppercase tracking-widest px-4 py-2 transition-all duration-200"
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  background: active ? color : 'transparent',
-                  color: active ? 'var(--obsidian)' : color,
-                  border: `1px solid ${active ? color : color + '50'}`,
-                }}
-              >
-                {CATEGORY_LABELS[cat]}
-              </button>
-            )
-          })}
-        </div>
+      {/* Filters */}
+      <div className="container-wide pb-12">
+        <Reveal>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setActiveCategory('all')}
+              className="caption transition-all duration-200"
+              style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: '0.62rem',
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+                padding: '0.6rem 1.1rem',
+                background: activeCategory === 'all' ? 'var(--gold)' : 'transparent',
+                color: activeCategory === 'all' ? 'var(--obsidian)' : 'var(--warm-white-muted)',
+                border: `1px solid ${activeCategory === 'all' ? 'var(--gold)' : 'var(--border)'}`,
+                cursor: 'pointer',
+                fontWeight: 500,
+              }}
+            >
+              All
+            </button>
+            {categories.map(cat => {
+              const color = CATEGORY_COLORS[cat];
+              const active = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className="caption transition-all duration-200"
+                  style={{
+                    fontFamily: 'var(--font-body)',
+                    fontSize: '0.62rem',
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+                    padding: '0.6rem 1.1rem',
+                    background: active ? color : 'transparent',
+                    color: active ? 'var(--obsidian)' : color,
+                    border: `1px solid ${active ? color : color + '40'}`,
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  {CATEGORY_LABELS[cat]}
+                </button>
+              );
+            })}
+          </div>
+        </Reveal>
       </div>
 
       {/* Node grid */}
-      <div className="max-w-[1280px] mx-auto px-6 pb-32">
+      <div className="container-wide" style={{ paddingBottom: 'clamp(5rem, 10vw, 8rem)' }}>
         <motion.div
           layout
           className="grid gap-px"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1px', background: 'var(--steel)' }}
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', background: 'var(--border)' }}
         >
           <AnimatePresence mode="popLayout">
             {filtered.map(node => (
@@ -308,13 +308,12 @@ export default function MemoryAtlasPage() {
         </motion.div>
 
         {filtered.length === 0 && (
-          <div className="py-24 text-center" style={{ color: 'var(--warm-white-muted)', fontFamily: 'var(--font-body)' }}>
+          <div className="py-24 text-center body" style={{ color: 'var(--warm-white-muted)' }}>
             No nodes in this category yet.
           </div>
         )}
       </div>
 
-      {/* Detail panel */}
       {selectedNode && (
         <DetailPanel
           node={selectedNode}
@@ -327,5 +326,5 @@ export default function MemoryAtlasPage() {
         <Footer />
       </div>
     </main>
-  )
+  );
 }
