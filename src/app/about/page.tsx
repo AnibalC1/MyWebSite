@@ -1,320 +1,195 @@
-'use client'
+'use client';
 
-import { useRef } from 'react'
-import { motion, useInView } from 'framer-motion'
-import Image from 'next/image'
-import Link from 'next/link'
-import Navigation from '@/components/layout/Navigation'
-import Footer from '@/components/layout/Footer'
+import Image from 'next/image';
+import Link from 'next/link';
+import Navigation from '@/components/layout/Navigation';
+import Footer from '@/components/layout/Footer';
+import Reveal from '@/components/ui/Reveal';
+import Eyebrow from '@/components/ui/Eyebrow';
+import PageHero from '@/components/ui/PageHero';
+import StatsRow from '@/components/ui/StatsRow';
+import PullQuote from '@/components/ui/PullQuote';
 
-function Reveal({
-  children,
-  className = '',
-  delay = 0,
-}: {
-  children: React.ReactNode
-  className?: string
-  delay?: number
-}) {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: '-80px' })
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 24 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-      transition={{ duration: 0.9, ease: [0.0, 0.0, 0.2, 1.0], delay }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  )
-}
+const STATS = [
+  { value: '2', label: 'Children', desc: 'The standard by which every decision is measured.' },
+  { value: '8+', label: 'Years on the Mat', desc: 'Brazilian Jiu-Jitsu is the honesty filter.' },
+  { value: '3', label: 'Systems Live', desc: 'Production systems running 24/7 on-chain.' },
+];
 
-function Divider() {
-  return (
-    <div
-      className="w-full"
-      style={{ height: '1px', background: 'rgba(201,168,76,0.2)' }}
-    />
-  )
-}
+const SECTIONS: { eyebrow: string; index: string; title: string; body: string[] }[] = [
+  {
+    eyebrow: 'Opening',
+    index: '01',
+    title: 'I am not a finished thing.',
+    body: [
+      'I am a man in the middle of becoming — building systems, raising children, training my body, and learning, slowly, to align how I live with who I actually am.',
+      'That work is never finished. That is the point.',
+    ],
+  },
+  {
+    eyebrow: 'Fatherhood',
+    index: '02',
+    title: 'I had to look at myself honestly.',
+    body: [
+      'There was a point where I had to look at myself honestly — not as a man with intentions, but as a father with a record.',
+      'I saw what my reactions were doing. I saw the gap between who I thought I was and how I was actually showing up. Intention was not enough. Awareness without change is just self-flattery.',
+      'So I started the work. Not because I had it figured out — but because I could not pretend I did not see it anymore. That moment changed everything.',
+    ],
+  },
+  {
+    eyebrow: 'Son',
+    index: '03',
+    title: 'He needed me to respect his path.',
+    body: [
+      'My son made decisions I did not agree with. Choices I would not have made. A path I did not choose for him.',
+      'For a long time, I thought that meant something was wrong.',
+      'Looking back, I understand it differently. He did not need me to control his path. He needed me to respect it. To trust that who he is matters more than who I imagined he should be.',
+      'That is a harder lesson than anything I have learned in a room.',
+    ],
+  },
+  {
+    eyebrow: 'Daughter',
+    index: '04',
+    title: 'She did not get the version still figuring it out.',
+    body: [
+      'By the time my daughter was born, I was not the same man.',
+      'I had already started the work — learning how to listen without defending, how to be present without performing, how to create stability instead of reacting to chaos.',
+      'She did not get the version of me that was still figuring it out. She got the version that had already started to change. That matters to me more than I can explain.',
+    ],
+  },
+  {
+    eyebrow: 'BJJ',
+    index: '05',
+    title: 'On the mat, nothing performs.',
+    body: [
+      'I train jiu-jitsu. Have for years.',
+      'Most things in life can be faked — status, confidence, knowledge. On the mat, none of that holds. You either know the technique or you do not. You are either calm under pressure or you are not.',
+      'Jiu-jitsu is one of the few places where nothing performs. It forces honesty — about your limits, your reactions, and your mind under pressure. That is why I keep coming back.',
+    ],
+  },
+  {
+    eyebrow: 'Work',
+    index: '06',
+    title: 'I was seeing patterns.',
+    body: [
+      'I have spent years working in technology — infrastructure, systems, operations. But over time I realized that what I was actually doing was not technical.',
+      'I was seeing patterns.',
+      'The same broken dynamics that exist in a failing IT system exist in a failing organization. In a relationship. In a person who will not examine themselves. Once you learn to see the structure underneath the surface, you cannot unsee it.',
+      'That is how I approach most things now. Not as problems to fix — but as systems to understand.',
+    ],
+  },
+  {
+    eyebrow: 'Present',
+    index: '07',
+    title: 'The standard. Everything else is details.',
+    body: [
+      'Right now I am building — AI systems, digital experiences, a book, a life that actually connects. Not to prove something. Not to perform.',
+      'To understand and refine who I am becoming. To leave something behind that reflects how I actually think, not just what I accomplished.',
+      'The projects matter. The work matters. But underneath all of it is one question I keep asking:',
+    ],
+  },
+];
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-[#0a0a0b]">
+    <main className="min-h-screen" style={{ background: 'var(--obsidian)' }}>
       <Navigation />
 
-      {/* Hero — portrait */}
-      <div className="relative overflow-hidden" style={{ height: 'min(85vh, 820px)' }}>
-        <Image
-          src="/images/photo-oq31-family-selfie.jpg"
-          alt="Anibal Cabral"
-          fill
-          priority
-          className="object-cover object-top"
-          style={{ filter: 'brightness(0.55)' }}
-        />
-        {/* Gold gradient overlay */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(ellipse at 60% 30%, rgba(201,168,76,0.08) 0%, transparent 60%), linear-gradient(to bottom, transparent 40%, #0a0a0b 100%)',
-          }}
-        />
-        <div className="absolute bottom-0 left-0 right-0 z-10 max-w-[1280px] mx-auto px-6 pb-16">
-          <motion.div
-            initial={{ opacity: 0, y: 32 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2, ease: [0.0, 0.0, 0.2, 1.0] }}
-          >
-            <p className="text-[0.6875rem] tracking-[0.35em] uppercase text-[#4a4845] mb-5">
-              About
-            </p>
-            <h1
-              className="font-[var(--font-display)] font-light leading-[0.9] tracking-[-0.03em] text-[#f0ede8]"
-              style={{ fontSize: 'clamp(3.5rem, 9vw, 9rem)' }}
-            >
-              Anibal
-              <br />
-              Cabral
-            </h1>
-          </motion.div>
-        </div>
-      </div>
+      <PageHero
+        eyebrow="About"
+        eyebrowIndex="01"
+        title={<>Anibal<br />Cabral</>}
+        image="/images/photo-oq31-family-selfie.jpg"
+        imageAlt="Anibal Cabral with family"
+        lede="Systems builder. Father of two. BJJ practitioner. Writing about engineering, leadership, and living deliberately."
+      />
 
+      <StatsRow stats={STATS} />
 
-      {/* Stats */}
-      <div className="max-w-[1280px] mx-auto px-6 py-24">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-12">
-          <Reveal>
-            <div className="flex flex-col gap-3">
-              <span className="font-light tracking-[-0.03em]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--gold)" }}>
-                2
-              </span>
-              <span className="text-[0.7rem] uppercase tracking-[0.2em]" style={{ color: "var(--warm-white)", fontFamily: "var(--font-body)" }}>
-                Children
-              </span>
-              <p className="text-sm leading-relaxed max-w-[32ch]" style={{ color: "var(--warm-white-muted)", fontFamily: "var(--font-body)" }}>
-                The standard by which every decision is measured.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <div className="flex flex-col gap-3">
-              <span className="font-light tracking-[-0.03em]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--gold)" }}>
-                8+
-              </span>
-              <span className="text-[0.7rem] uppercase tracking-[0.2em]" style={{ color: "var(--warm-white)", fontFamily: "var(--font-body)" }}>
-                Years on the Mat
-              </span>
-              <p className="text-sm leading-relaxed max-w-[32ch]" style={{ color: "var(--warm-white-muted)", fontFamily: "var(--font-body)" }}>
-                Brazilian Jiu-Jitsu is the honesty filter.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={0.2}>
-            <div className="flex flex-col gap-3">
-              <span className="font-light tracking-[-0.03em]" style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.5rem, 5vw, 4rem)", color: "var(--gold)" }}>
-                3
-              </span>
-              <span className="text-[0.7rem] uppercase tracking-[0.2em]" style={{ color: "var(--warm-white)", fontFamily: "var(--font-body)" }}>
-                Systems Live
-              </span>
-              <p className="text-sm leading-relaxed max-w-[32ch]" style={{ color: "var(--warm-white-muted)", fontFamily: "var(--font-body)" }}>
-                Production systems running 24/7 on-chain.
-              </p>
-            </div>
-          </Reveal>
-        </div>
-      </div>
-
-      <div className="max-w-[860px] mx-auto px-6">
-        <div style={{ height: "1px", background: "rgba(201,168,76,0.1)" }} />
+      <div className="container-content">
+        <div className="hairline" />
       </div>
 
       {/* Prose */}
-      <div className="max-w-[860px] mx-auto px-6 pb-40 mt-20">
+      <article className="container-content" style={{ paddingBlock: 'clamp(4rem, 8vw, 6rem)' }}>
+        {SECTIONS.map((section, idx) => (
+          <Reveal key={section.index} className="py-12 md:py-16">
+            <div className="max-w-[68ch]">
+              <div className="mb-6">
+                <Eyebrow index={section.index}>{section.eyebrow}</Eyebrow>
+              </div>
+              <h2 className="h2 mb-8" style={{ maxWidth: '20ch' }}>
+                {section.title}
+              </h2>
+              <div className="flex flex-col gap-6">
+                {section.body.map((p, i) => (
+                  <p key={i} className="body-lg">{p}</p>
+                ))}
+                {idx === SECTIONS.length - 1 && (
+                  <>
+                    <p className="h3 mt-4" style={{ color: 'var(--warm-white)' }}>
+                      Am I becoming the person I want my children to have known?
+                    </p>
+                    <p className="body-lg">That is the standard. Everything else is details.</p>
+                  </>
+                )}
+              </div>
+            </div>
 
-        {/* Section 1 — Opening */}
-        <Reveal className="py-16">
-          <div className="flex flex-col gap-6 max-w-[70ch]">
-            <p className="text-[#7a7875] text-base leading-[1.95]">I am not a finished thing.</p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              I am a man in the middle of becoming — building systems, raising children, training my body, and learning, slowly, to align how I live with who I actually am.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">That work is never finished. That is the point.</p>
-          </div>
-        </Reveal>
+            {/* Inline image after Fatherhood section */}
+            {idx === 1 && (
+              <div className="mt-16 relative overflow-hidden" style={{ height: 'clamp(280px, 50vw, 460px)' }}>
+                <Image
+                  src="/images/photo-0afl-birthday-family.jpg"
+                  alt="Anibal with family at a celebration"
+                  fill
+                  className="object-cover"
+                  style={{ filter: 'brightness(0.78) saturate(0.95)' }}
+                />
+                <div
+                  className="absolute inset-0"
+                  style={{ background: 'linear-gradient(to top, rgba(10,10,11,0.5) 0%, transparent 60%)' }}
+                />
+              </div>
+            )}
+            {idx === 4 && (
+              <div className="mt-16 relative overflow-hidden" style={{ height: 'clamp(320px, 56vw, 540px)' }}>
+                <Image
+                  src="/images/photo-3wun-BJJ.jpg"
+                  alt="Anibal training jiu-jitsu"
+                  fill
+                  className="object-cover object-center"
+                  style={{ filter: 'brightness(0.8) saturate(0.95)' }}
+                />
+                <div
+                  className="absolute inset-0"
+                  style={{ background: 'linear-gradient(to top, rgba(10,10,11,0.55) 0%, transparent 55%)' }}
+                />
+              </div>
+            )}
 
-        <Divider />
+            {idx < SECTIONS.length - 1 && <div className="hairline mt-16" />}
+          </Reveal>
+        ))}
+      </article>
 
-        {/* Section 2 — Fatherhood */}
-        <Reveal className="py-16">
-          <div className="flex flex-col gap-6 max-w-[70ch]">
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              There was a point where I had to look at myself honestly — not as a man with intentions, but as a father with a record.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              I saw what my reactions were doing. I saw the gap between who I thought I was and how I was actually showing up. Intention was not enough. Awareness without change is just self-flattery.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              So I started the work. Not because I had it figured out — but because I could not pretend I did not see it anymore. That moment changed everything.
-            </p>
-          </div>
-        </Reveal>
+      <PullQuote>I become precise.</PullQuote>
 
-        {/* Family photo */}
-        <Reveal className="pb-16">
-          <div className="relative overflow-hidden" style={{ height: '400px' }}>
-            <Image
-              src="/images/photo-0afl-birthday-family.jpg"
-              alt="Anibal with family at a celebration"
-              fill
-              className="object-cover"
-              style={{ filter: 'brightness(0.8)' }}
-            />
-            <div
-              className="absolute inset-0"
-              style={{ background: 'linear-gradient(to top, rgba(10,10,11,0.4) 0%, transparent 60%)' }}
-            />
-          </div>
-        </Reveal>
-
-        <Divider />
-
-        {/* Section 3 — Son */}
-        <Reveal className="py-16">
-          <div className="flex flex-col gap-6 max-w-[70ch]">
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              My son made decisions I did not agree with. Choices I would not have made. A path I did not choose for him.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">For a long time, I thought that meant something was wrong.</p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              Looking back, I understand it differently. He did not need me to control his path. He needed me to respect it. To trust that who he is matters more than who I imagined he should be.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">That is a harder lesson than anything I have learned in a room.</p>
-          </div>
-        </Reveal>
-
-        <Divider />
-
-        {/* Section 4 — Daughter */}
-        <Reveal className="py-16">
-          <div className="flex flex-col gap-6 max-w-[70ch]">
-            <p className="text-[#7a7875] text-base leading-[1.95]">By the time my daughter was born, I was not the same man.</p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              I had already started the work — learning how to listen without defending, how to be present without performing, how to create stability instead of reacting to chaos.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              She did not get the version of me that was still figuring it out. She got the version that had already started to change. That matters to me more than I can explain.
-            </p>
-          </div>
-        </Reveal>
-
-        <Divider />
-
-        {/* Section 5 — BJJ */}
-        <Reveal className="py-16">
-          <div className="flex flex-col gap-6 max-w-[70ch]">
-            <p className="text-[#7a7875] text-base leading-[1.95]">I train jiu-jitsu. Have for years.</p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              Most things in life can be faked — status, confidence, knowledge. On the mat, none of that holds. You either know the technique or you do not. You are either calm under pressure or you are not.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              Jiu-jitsu is one of the few places where nothing performs. It forces honesty — about your limits, your reactions, and your mind under pressure. That is why I keep coming back.
-            </p>
-          </div>
-        </Reveal>
-
-        {/* BJJ photo */}
-        <Reveal className="pb-16">
-          <div className="relative overflow-hidden" style={{ height: '480px' }}>
-            <Image
-              src="/images/photo-3wun-BJJ.jpg"
-              alt="Anibal training jiu-jitsu"
-              fill
-              className="object-cover object-center"
-              style={{ filter: 'brightness(0.85)' }}
-            />
-            <div
-              className="absolute inset-0"
-              style={{ background: 'linear-gradient(to top, rgba(10,10,11,0.5) 0%, transparent 50%)' }}
-            />
-          </div>
-        </Reveal>
-
-        <Divider />
-
-        {/* Section 6 — Work */}
-        <Reveal className="py-16">
-          <div className="flex flex-col gap-6 max-w-[70ch]">
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              I have spent years working in technology — infrastructure, systems, operations. But over time I realized that what I was actually doing was not technical.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">I was seeing patterns.</p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              The same broken dynamics that exist in a failing IT system exist in a failing organization. In a relationship. In a person who will not examine themselves. Once you learn to see the structure underneath the surface, you cannot unsee it.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              That is how I approach most things now. Not as problems to fix — but as systems to understand.
-            </p>
-          </div>
-        </Reveal>
-
-        <Divider />
-
-        {/* Section 7 — Present */}
-        <Reveal className="py-16">
-          <div className="flex flex-col gap-6 max-w-[70ch]">
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              Right now I am building — AI systems, digital experiences, a book, a life that actually connects. Not to prove something. Not to perform.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              To understand and refine who I am becoming. To leave something behind that reflects how I actually think, not just what I accomplished.
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">
-              The projects matter. The work matters. But underneath all of it is one question I keep asking:
-            </p>
-            <p
-              className="font-[var(--font-display)] text-[#f0ede8] leading-[1.3] tracking-[-0.01em] mt-4"
-              style={{ fontSize: 'clamp(1.2rem, 2.2vw, 1.6rem)' }}
-            >
-              Am I becoming the person I want my children to have known?
-            </p>
-            <p className="text-[#7a7875] text-base leading-[1.95]">That is the standard. Everything else is details.</p>
-          </div>
-        </Reveal>
-
-        {/* Pull quote */}
-        <Reveal className="py-24 flex justify-center">
-          <p
-            className="font-[var(--font-display)] text-[#c9a84c] italic leading-[1.15] tracking-[-0.01em] text-center"
-            style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}
-          >
-            I become precise.
-          </p>
-        </Reveal>
-
-        <div style={{ height: '1px', background: 'rgba(201,168,76,0.2)', marginBottom: '4rem' }} />
-
+      <section className="container-content section-tight">
+        <div className="hairline mb-12" />
         <Reveal>
           <div className="flex flex-col sm:flex-row gap-8 sm:items-center justify-between">
-            <p className="text-[#7a7875] text-sm leading-relaxed max-w-[40ch]">
+            <p className="body" style={{ maxWidth: '42ch' }}>
               I read everything. I reply to what matters.
             </p>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-3 text-sm text-[#7a7875] hover:text-[#c9a84c] transition-colors duration-200 border-b border-transparent hover:border-[#c9a84c] pb-0.5 w-fit"
-            >
-              Get in touch
-              <span aria-hidden>→</span>
+            <Link href="/contact" className="btn btn-secondary">
+              Get in touch <span aria-hidden>→</span>
             </Link>
           </div>
         </Reveal>
-      </div>
+      </section>
+
       <Footer />
     </main>
-  )
+  );
 }
