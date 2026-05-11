@@ -44,7 +44,7 @@ export default function ConstellationLines({ lines, activeCluster }: Props) {
       {spokeGeometries.map(({ geo, cluster }, i) => {
         const dimmed = activeCluster && activeCluster !== cluster;
         return (
-          <line key={i}>
+          <threeLine key={i}>
             <primitive object={geo} attach="geometry" />
             <lineBasicMaterial
               color="#c9a96e"
@@ -52,7 +52,7 @@ export default function ConstellationLines({ lines, activeCluster }: Props) {
               opacity={dimmed ? 0.04 : 0.14}
               toneMapped={false}
             />
-          </line>
+          </threeLine>
         );
       })}
       <lineSegments>

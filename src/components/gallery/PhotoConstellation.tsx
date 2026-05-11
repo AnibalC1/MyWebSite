@@ -98,7 +98,7 @@ function ClusterLabel({
 function SceneContents({ activeCluster, focusCluster, onSelectPhoto, onSelectCluster }: Props) {
   const placements = useMemo(() => buildPlacements(), []);
   const groupRef = useRef<THREE.Group>(null);
-  const { camera, mouse } = useThree();
+  const { camera, pointer } = useThree();
   const lookTargetRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
   const camTargetRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 11));
 
@@ -125,8 +125,8 @@ function SceneContents({ activeCluster, focusCluster, onSelectPhoto, onSelectClu
 
   useFrame((_state, delta) => {
     if (groupRef.current) {
-      const rx = -mouse.y * 0.14;
-      const ry = mouse.x * 0.2;
+      const rx = -pointer.y * 0.14;
+      const ry = pointer.x * 0.2;
       groupRef.current.rotation.x += (rx - groupRef.current.rotation.x) * 0.04;
       groupRef.current.rotation.y += (ry - groupRef.current.rotation.y) * 0.04;
       // Idle slow drift
