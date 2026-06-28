@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
@@ -23,7 +23,6 @@ export default function PhotoCard({
 }: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const matRef = useRef<THREE.MeshBasicMaterial>(null);
-  const borderRef = useRef<THREE.LineBasicMaterial>(null);
   const [hovered, setHovered] = useState(false);
 
   const tex = useTexture(photo.src);
@@ -50,19 +49,50 @@ export default function PhotoCard({
   }, [tex]);
   /* eslint-enable react-hooks/immutability */
 
+  // Construct the border as a real THREE.LineLoop and render via <primitive>
+  // (avoids JSX intrinsic naming issues with line elements in R3F 9).
+  const border = useMemo(() => {
+    const [w, h] = dims;
+    const hw = w / 2, hh = h / 2;
+    const pad = 0.03;
+    const pts = [
+      new THREE.Vector3(-hw - pad, -hh - pad, 0.01),
+      new THREE.Vector3( hw + pad, -hh - pad, 0.01),
+      new THREE.Vector3( hw + pad,  hh + pad, 0.01),
+      new THREE.Vector3(-hw - pad,  hh + pad, 0.01),
+    ];
+    const geometry = new THREE.BufferGeometry().setFromPoints(pts);
+    const material = new THREE.LineBasicMaterial({
+      color: '#c9a96e',
+      transparent: true,
+      opacity: 0,
+      toneMapped: false,
+    });
+    const line = new THREE.LineLoop(geometry, material);
+    line.frustumCulled = false;
+    return { line, material, geometry };
+  }, [dims]);
+
+  // Dispose on unmount / when border changes
+  useEffect(() => {
+    return () => {
+      border.geometry.dispose();
+      border.material.dispose();
+    };
+  }, [border]);
+
   const fadeInRef = useRef(0);
 
+  // three.js objects are mutated inside useFrame — that is the standard r3f
+  // pattern. Suppress the immutability lint which doesn't understand it.
+  /* eslint-disable react-hooks/immutability */
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    // Fade in once the texture is loaded (Suspense already resolved, so we're here)
     fadeInRef.current = Math.min(1, fadeInRef.current + 0.018);
 
     if (groupRef.current) {
-      // Always face the camera (billboard)
       groupRef.current.quaternion.copy(state.camera.quaternion);
-      // Subtle bob
       groupRef.current.position.y = position[1] + Math.sin(t * 0.6 + bobSeed) * 0.04;
-      // Scale on hover/highlight
       const target = (hovered || highlighted ? 1.35 : 1.0) * (0.6 + 0.4 * fadeInRef.current);
       const cur = groupRef.current.scale.x;
       const next = cur + (target - cur) * 0.12;
@@ -73,30 +103,11 @@ export default function PhotoCard({
       const cur = matRef.current.opacity;
       matRef.current.opacity = cur + (targetOpacity - cur) * 0.1;
     }
-    if (borderRef.current) {
-      const target = (hovered ? 1.0 : faded ? 0.08 : 0.42) * fadeInRef.current;
-      const cur = borderRef.current.opacity;
-      borderRef.current.opacity = cur + (target - cur) * 0.1;
-    }
+    const borderTarget = (hovered ? 1.0 : faded ? 0.08 : 0.42) * fadeInRef.current;
+    const curB = border.material.opacity;
+    border.material.opacity = curB + (borderTarget - curB) * 0.1;
   });
-
-  const borderPoints = useMemo(() => {
-    const [w, h] = dims;
-    const hw = w / 2, hh = h / 2;
-    const pad = 0.03;
-    return [
-      new THREE.Vector3(-hw - pad, -hh - pad, 0.01),
-      new THREE.Vector3( hw + pad, -hh - pad, 0.01),
-      new THREE.Vector3( hw + pad,  hh + pad, 0.01),
-      new THREE.Vector3(-hw - pad,  hh + pad, 0.01),
-      new THREE.Vector3(-hw - pad, -hh - pad, 0.01),
-    ];
-  }, [dims]);
-
-  const borderGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry().setFromPoints(borderPoints);
-    return g;
-  }, [borderPoints]);
+  /* eslint-enable react-hooks/immutability */
 
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -127,16 +138,7 @@ export default function PhotoCard({
           side={THREE.DoubleSide}
         />
       </mesh>
-      <lineLoop>
-        <primitive object={borderGeo} attach="geometry" />
-        <lineBasicMaterial
-          ref={borderRef}
-          color="#c9a96e"
-          transparent
-          opacity={0}
-          toneMapped={false}
-        />
-      </lineLoop>
+      <primitive object={border.line} />
     </group>
   );
 }
